@@ -24,55 +24,46 @@ parameters that enter `L`, `μ`, `Σ` and `Tag` is a disambiguation flag used at
 compile time or for multiple dispatch to differentiate between different
 observation types.
 """
-struct LinearGsnObs{Tag,D,T,FPT,S,R,K} <: Observation{D,T}
-    L::S
-    μ::T
-    Σ::R
+struct LinearGsnObs{Tag,D,T,FPT,TL,Tμ,TΣ,K} <: Observation{D,T}
+    L::TL
+    μ::Tμ
+    Σ::TΣ
     obs::T
     t::Float64
     full_obs::Bool
     θ::Vector{K}
 
     function LinearGsnObs(
-            t, obs::T, L::S, Σ::R, μ::T, fpt::FPT, full_obs, θ::Vector{K}, Tag,
-        ) where {T,S,R,FPT,K}
+            t, obs::T, L::TL, Σ::TΣ, μ::Tμ, fpt::FPT, full_obs, θ::Vector{K}, Tag,
+        ) where {T,TL,TΣ,Tμ,FPT,K}
         D = length(obs)
-        new{Tag,D,T,FPT,S,R,K}(L, μ, Σ, obs, t, full_obs, θ)
+        new{Tag,D,T,FPT,TL,Tμ,TΣ,K}(L, μ, Σ, obs, t, full_obs, θ)
     end
 end
 
-function LinearGsnObs(t, obs; kwargs...)
-    LinearGsnObs(ismutable(obs), t, obs; kwargs...)
-end
+_default_L(obs) = _default_L(obs, ismutable(obs))
+_default_L(obs::T, ::Val{true}) where T = Diagonal(repeat([one(eltype(T))], length(obs)))
+_default_L(obs::T, ::Val{false}) where T = SDiagonal{length(obs)}(I)
+
+_default_Σ(obs) = _default_Σ(obs, ismutable(obs))
+_default_Σ(obs::T, ::Val{true}) where T = Diagonal(repeat([one(eltype(T))], length(obs)))*1e-11
+_default_Σ(obs::T, ::Val{false}) where T = SDiagonal{length(obs)}(I)*1e-11
+
+_default_μ(obs) = _default_μ(obs, ismutable(obs))
+_default_μ(obs::T, ::Val{true}) where T = zeros(eltype(T),length(obs))
+_default_μ(obs::T, ::Val{false}) where T = zero(T)
 
 function LinearGsnObs(
-        ::Val{true},
         t,
         obs::T;
-        L::S=Diagonal(repeat([one(eltype(T))], length(obs))),
-        Σ::R=Diagonal(repeat([one(eltype(T))], length(obs)))*1e-11,
-        μ::T=zeros(eltype(T),length(obs)),
-        fpt::FPT=NoFirstPassageTimes(),
+        L=_default_L(obs),
+        Σ=_default_Σ(obs),
+        μ=_default_μ(obs),
+        fpt=NoFirstPassageTimes(),
         full_obs=false,
         Tag=0,
         θ=[],
-    ) where {T,S,R,FPT}
-    @assert length(θ) == 0 || Tag > 0
-    LinearGsnObs(t, obs, L, Σ, μ, fpt, full_obs, θ, Tag)
-end
-
-function LinearGsnObs(
-        ::Val{false},
-        t,
-        obs::T;
-        L::S=SDiagonal{length(obs)}(I),
-        Σ::R=SDiagonal{length(obs)}(I)*1e-11,
-        μ::T=zero(T),
-        fpt::FPT=NoFirstPassageTimes(),
-        full_obs=false,
-        Tag=0,
-        θ=[],
-    ) where {T,S,R,FPT}
+    ) where T
     @assert length(θ) == 0 || Tag > 0
     LinearGsnObs(t, obs, L, Σ, μ, fpt, full_obs, θ, Tag)
 end
@@ -85,39 +76,6 @@ Return information about first-passage times
 fpt_info(::LinearGsnObs{Tag,D,T,FPT}) where {Tag,D,T,FPT} = FPT
 
 get_tag(::LinearGsnObs{Tag}) where Tag = Tag
-#=
-function show(obs::LinearGsnObs)
-    L, μ, Σ, v = L(obs), μ(obs), Σ(obs), ν(obs)
-    t, full_obs = obs.t, obs.full_obs
-    θ = parameters(obs)
-    parametric_type = get_tag(obs) > 0
-    L_size = size(L)
-    println(repeat("⏤", 40 ))
-    println(
-        "|Observation `v = Lx+ξ`, where `L` is a $L_size-matrix, `x` is a ",
-        "state of the stochastic process and `ξ`∼N(μ,Σ)."
-    )
-    println("|...")
-    println("|| v: $v (observation),\n|| \t→ typeof(v): ", typeof(v),",")
-    println("|| made at time $t.")
-    println("|...")
-    println("|L: $L,\n|\t→ typeof(L): ", typeof(L))
-    println("|μ: $μ,\n|\t→ typeof(μ): ", typeof(μ))
-    println("|Σ: $Σ,\n|\t→ typeof(Σ): ", typeof(Σ))
-    println("|...")
-    println("|This is ", (full_obs ? "" : "NOT ") , "an exact observation.")
-    println("|...")
-    println(
-        "|It ",
-        parametric_type ?
-        "depends on additional parameters, which are set to: $θ." :
-        "does not depend on any additional parameters."
-    )
-    println("|...")
-    show(fpt_info(obs); prepend="|")
-    println(repeat("⋆ ", 10))
-end
-=#
 
 function Base.summary(io::IO, obs::LinearGsnObs)
     _L, _μ, _Σ, v = L(obs), μ(obs), Σ(obs), ν(obs)
@@ -153,14 +111,51 @@ function Base.summary(io::IO, obs::LinearGsnObs)
     println(io, repeat("⋆ ", 10))
 end
 
-Base.summary(o::LinearGsnObs) = summary(Base.stdout, o)
+Base.summary(o::Observation) = summary(Base.stdout, o)
 
+"""
+    L(o::LinearGsnObs)
+
+Return matrix L from the observation scheme ν = Lx+ξ, where ξ∼N(μ,Σ)
+"""
 L(o::LinearGsnObs) = o.L
+
+"""
+    μ(o::LinearGsnObs)
+
+Return vector μ from the observation scheme ν = Lx+ξ, where ξ∼N(μ,Σ)
+"""
 μ(o::LinearGsnObs) = o.μ
+
+"""
+    Σ(o::LinearGsnObs)
+
+Return matrix Σ from the observation scheme ν = Lx+ξ, where ξ∼N(μ,Σ)
+"""
 Σ(o::LinearGsnObs) = o.Σ
+
+"""
+    Λ(o::LinearGsnObs)
+
+Return matrix Λ:=Σ⁻¹ from the observation scheme ν = Lx+ξ, where ξ∼N(μ,Σ)
+"""
 Λ(o::LinearGsnObs) = inv(o.Σ)
-ν(o::LinearGsnObs) = o.obs
+
+"""
+    ν(o::Observation)
+
+Return the observation
+"""
+ν(o::Observation) = o.obs
+
+"""
+    obs(o::Observation)
+
+Alias to ν. Return the observation.
+"""
 obs = ν
+
+
 clone(o::LinearGsnObs{0}, args...) = o
 update_params!(o::LinearGsnObs{0}, new_params...) = o
 
@@ -173,5 +168,5 @@ function update_params!(o::LinearGsnObs, new_params...)
     o
 end
 
-parameter_names(o::LinearGsnObs) = tuple()
-parameters(o::LinearGsnObs) = tuple(o.θ...)
+parameter_names(o::Observation) = tuple()
+parameters(o::Observation) = tuple(o.θ...)

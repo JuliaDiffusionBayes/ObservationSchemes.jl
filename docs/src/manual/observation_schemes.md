@@ -249,4 +249,72 @@ julia> summary(obs)
 !!! note
     We used number `-99.9` just to remind ourselves that entries with this number need to be overwritten by parameters. There are however no rules or enforcements as to how the user deals with such entries.
 
+Notice that trying to access `L` via `obs.L` will give you an incorrect result. To avoid such mistakes, always query `L`, `μ`, `obs` (with alias `ν`) and `Σ` via accessors:
+```@docs
+ObservationSchemes.L
+ObservationSchemes.μ
+ObservationSchemes.Σ
+ObservationSchemes.ν
+ObservationSchemes.obs
+```
+
 ## Non-linear, non-Gaussian observations
+In principle, any observation types are supported, but this comes at a cost of having to provide some information explicitly. The main struct for specifing general observation schemes is
+```@docs
+ObservationSchemes.GeneralObs
+```
+
+For this struct, the required parameters are the time of observation and the observation itself as well as the approximation via `LinearGsnObs`. For instance, to specify the following observational scheme:
+```math
+V_t = g(X_t)+ξ
+```
+where ξ is distributed according to a bivariate $$T$$-distribution with $$4$$ degrees of freedom, some specified mean $$\mu$$ and covariance $$\Sigma$$, $$g$$ is a non-linear function:
+```math
+g(x):=
+\left(
+\begin{matrix}
+(x^{[1]})^2\\
+(x^{[2]})^2
+\end{matrix}
+\right)
+```
+we may write:
+```julia
+using Distributions
+# recording
+t, v = 1.5, [1.0, 2.0]
+
+# for the observation scheme
+μ, Σ = [-1.0, 2.0], [1.0 0.0; 0.0 1.0]
+dist = MvTDist(4, μ, Σ)
+g(x) = view(x, 1:2).^2
+
+# for some poor, ad-hoc Gaussian approximation
+L = [2.0 0.0 0.0; 0.0 2.0 0.0]
+
+# define observation
+obs = GeneralObs(t, v, LinearGsnObs(t, v; L=L, Σ=Σ, μ=μ); dist=dist, g=g)
+```
+We can now view the summary:
+```julia
+julia> summary(obs)
+⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤
+|Observation `v = g(x)+ξ`, where `g` is an operator defined by a function typeof(g), and `ξ` is a random variable given byDistributions.GenericMvTDist{Float64,PDMats.PDMat{Float64,Array{Float64,2}},Array{Float64,1}}.
+|...
+|| ν: [1.0, 2.0, 3.0] (observation),
+||  → typeof(ν): SArray{Tuple{3},Float64,1,3},
+|| made at time 2.0.
+|...
+|This is NOT an exact observation.
+|...
+|It does not depend on any additional parameters.
+|...
+|No first passage times recorded.
+|...
+|To inspect the linearized approximation to this observation scheme please type in:
+|   summary(<name-of-the-variable>.lin_obs)
+|and hit ENTER.
+⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆
+```
+!!! tip
+    The `GeneralObs` can be decorated with first-passage time information and parameters in the same way as `LinearGsnObs` can. However, by design, you cannot set `full_obs` to `true` for `GeneralObs`.

@@ -16,8 +16,9 @@ module ObservationSchemes
 
     include("starting_point_priors.jl")
     include("first_passage_times.jl")
-    include("observations_general.jl")
+    include("observations_common.jl")
     include("observations_linear_gaussian.jl")
+    include("observations_general.jl")
     include("all_observations.jl")
     include("convenience_functions.jl")
 
@@ -29,6 +30,9 @@ module ObservationSchemes
 
     # observations_lienar_gaussian.jl
     export LinearGsnObs, fpt_info
+
+    # observations_general.jl
+    export GeneralObs
 
     # all_observations.jl
     export AllObservations, add_recording!, add_dependency!, initialize!

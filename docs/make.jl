@@ -23,7 +23,6 @@ makedocs(;
         "Home" => "index.md",
         "Get started" => joinpath("get_started", "overview.md"),
         "User manual" => Any[
-            "Overview" => joinpath("manual", "overview.md"),
             "A single observation" => joinpath("manual", "observation_schemes.md"),
             "Priors over starting points" => joinpath("manual", "start_pt_prior.md"),
             "Multiple observations" => joinpath("manual", "multiple_observations.md"),
@@ -51,7 +50,7 @@ makedocs(;
     repo="https://github.com/JuliaDiffusionBayes/ObservationSchemes.jl/blob/{commit}{path}#L{line}",
     sitename="ObservationSchemes.jl",
     authors="Sebastiano Grazzi, Frank van der Meulen, Marcin Mider, Moritz Schauer",
-    assets=String[],
+    #assets=String[],
 )
 
 deploydocs(;

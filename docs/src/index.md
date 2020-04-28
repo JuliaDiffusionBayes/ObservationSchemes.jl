@@ -25,6 +25,6 @@ Finally, we provide infrastructure for defining priors over starting points. In 
 Depending on your experience and intended use of this package you might consider starting at different places of this documentation.
 
 - For a quick overview of this package's main functionality see [Get started](@ref get_started)
-- For a systematic introduction to all functionality introduced in this package see the [Manual](@ref manual_overview)
+- For a systematic introduction to all functionality introduced in this package see the [Manual](@ref manual_start)
 - For a didactic introduction to problems that can be solved using our package see the [Tutorials](@ref tutorial_single_path)
 - If you have a problem that you think can be addressed with this package, then check out the [How-to guides](@ref simple_observation_schemes) to see if the answer is already there.

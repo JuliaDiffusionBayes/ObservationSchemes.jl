@@ -70,10 +70,6 @@ end
 
 strip_fpt_info(::Type{FirstPassageTimeInfo{C,L,U,A,R}}) where {C,L,U,A,R} = (C,L,U,A,R)
 
-function show(::Type{NoFirstPassageTimes}; prepend="")
-    println(prepend, "No first passage times recorded.")
-end
-
 cpad(s, n) = cpad(string(s), n)
 
 function cpad(s::String, n::Integer)
@@ -81,7 +77,15 @@ function cpad(s::String, n::Integer)
     lpad(reverse(lpad(reverse(s), rpad_n)),n)
 end
 
-function show(fpt::Type{<:FirstPassageTimeInfo}; prepend="")
+Base.summary(io::IO, fpt::Type{<:FirstPassageTimeInfo}) = _summary_fpt(io, fpt)
+Base.summary(fpt::Type{<:FirstPassageTimeInfo}) = summary(Base.stdout, fpt)
+
+
+function _summary_fpt(io::IO, ::Type{NoFirstPassageTimes}; prepend="")
+    println(io, prepend, "No first passage times recorded.")
+end
+
+function _summary_fpt(io::IO, fpt; prepend="")
     (
         coords,
         levels,
@@ -90,17 +94,19 @@ function show(fpt::Type{<:FirstPassageTimeInfo}; prepend="")
         reset_levels
     ) = strip_fpt_info(fpt)
     pad_len = 14
-    println(prepend, "First passage times of the observation `v`: ")
-    println(prepend, repeat("-", pad_len*5+6))
+    println(io, prepend, "First passage times of the observation `v`: ")
+    println(io, prepend, repeat("-", pad_len*5+6))
     println(
+        io,
         prepend,
         "|", cpad("coordinate", pad_len), "|", cpad("level", pad_len),
         "|", cpad("up-crossing", pad_len), "|", cpad("extra reset", pad_len),
         "|", cpad("reset level", pad_len), "|"
     )
-    println(prepend, repeat("-", pad_len*5+6))
+    println(io, prepend, repeat("-", pad_len*5+6))
     for (coord, lev, upcross, addres, reslvl) in zip(strip_fpt_info(fpt)...)
         println(
+            io,
             prepend,
             "|", cpad(coord, pad_len), "|", cpad(lev, pad_len),
             "|", cpad((upcross ? "up-crossing" : "down-crossing"), pad_len),

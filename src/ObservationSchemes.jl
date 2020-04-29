@@ -2,11 +2,9 @@ module ObservationSchemes
 
     using LinearAlgebra, StaticArrays
     using GaussianDistributions, Random
+    using Distributions
 
-    import Random.rand
-    import Distributions.logpdf
     import GaussianDistributions: whiten, unwhiten
-    import Base.show
 
     # these are used throughout the suite, they need to be put into one place only
     # and imported from there.
@@ -20,6 +18,7 @@ module ObservationSchemes
     include("observations_linear_gaussian.jl")
     include("observations_general.jl")
     include("all_observations.jl")
+    include("obs_scheme.jl")
     include("convenience_functions.jl")
 
     # starting_point_priors.jl
@@ -36,6 +35,9 @@ module ObservationSchemes
 
     # all_observations.jl
     export AllObservations, add_recording!, add_dependency!, initialize!
+
+    # obs_scheme.jl
+    export ObsScheme, load_data
 
     # convenience_functions.jl
     export package, build_recording, num_recordings, num_obs

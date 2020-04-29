@@ -195,7 +195,7 @@ end
 
 
 """
-    initialize(all_obs::AllObservations)
+    initialize!(all_obs::AllObservations)
 
 Split the recordings at the times of full observations to make full use of the
 Markov property (and make the code readily parallelisable).

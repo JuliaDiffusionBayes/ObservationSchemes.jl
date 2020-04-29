@@ -6,6 +6,14 @@
         ✔   building recordrings that share the observation schemes
 
 ===============================================================================#
+"""
+    package
+
+Various packaging functions that zip together objects/functions/structs together
+with observations defined in AllObservations/recording
+"""
+function package end
+
 function package(objs::AbstractArray, all_obs::AllObservations)
     N = length(objs)
     @assert N == length(all_obs.recordings)
@@ -53,6 +61,13 @@ function package(obj, all_obs::AllObservations)
     packaged
 end
 
+"""
+    build_recording(
+            ::Type{K}, tt, observs::Vector, P, t0, x0_prior; kwargs...
+        ) where K
+Utility function to build a recording that follows the convention adopted in 
+package ObservationSchemes.
+"""
 function build_recording(
         ::Type{K}, tt, observs::Vector, P, t0, x0_prior; kwargs...
     ) where K
@@ -64,6 +79,18 @@ function build_recording(
     )
 end
 
+"""
+    setup_time_grids(
+        all_obs::AllObservations,
+        dt=0.01,
+        τ=identity,
+        eltype=Float64,
+        already_arranged_tt=nothing
+    )
+
+Same as a version for a single recording, but applies recursively  to all
+recordings in `all_obs`.
+"""
 function setup_time_grids(
         all_obs::AllObservations,
         dt=0.01,
@@ -93,7 +120,21 @@ end
 
 _idx_if_array(x, i) = typeof(x) <: AbstractArray ? x[i] : x
 
+"""
+    setup_time_grids(
+        recording::NamedTuple,
+        dt=0.01,
+        τ=identity,
+        eltype=Float64,
+        already_arranged_tt=nothing
+    )
 
+Set up a time grid for a single recording. Starts with an equidistant time grid
+with mesh witdh `dt` and applies a transformation `τ` to each inter-observation
+integral. Alternatively, if `already_arranged_tt` is passed then the initial
+setting up of equidistant grid is omitted and `already_arrange_tt` is used in
+its place for the `τ` transformation.
+"""
 function setup_time_grids(
         recording::NamedTuple,
         dt=0.01,
@@ -118,6 +159,23 @@ function setup_time_grids(
     arranged_tt
 end
 
+
+"""
+    setup_time_grids(
+        t0::Number,
+        T::Number,
+        dt=0.01,
+        τ=identity,
+        eltype=Float64,
+        already_arranged_tt=nothing
+    )
+
+Set up a time grid for a single inter-observation interval [`t0`, `T`]. Starts
+with an equidistant time grid with mesh witdh `dt` and applies a transformation
+`τ` afterwards. Alternatively, if `already_arranged_tt` is passed then the
+initial setting up of an equidistant grid is omitted and `already_arrange_tt` is
+used in its place for the `τ` transformation.
+"""
 function setup_time_grids(
         t0::Number,
         T::Number,
@@ -133,8 +191,18 @@ function setup_time_grids(
     tt = eltype.(τ(collect(t0:dt:T)))
 end
 
+"""
+    num_recordings(all_obs::AllObservations)
+
+Return total number of recordings
+"""
 num_recordings(all_obs::AllObservations) = length(all_obs.recordings)
 
+"""
+    num_obs(all_obs::AllObservations)
+
+Return total number of observations
+"""
 function num_obs(all_obs::AllObservations)
     mapreduce(r->length(r.obs), +, all_obs.recordings)
 end

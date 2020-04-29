@@ -23,9 +23,10 @@ makedocs(;
         "Home" => "index.md",
         "Get started" => joinpath("get_started", "overview.md"),
         "User manual" => Any[
-            "A single observation" => joinpath("manual", "observation_schemes.md"),
+            "A single observation" => joinpath("manual", "single_observation.md"),
             "Priors over starting points" => joinpath("manual", "start_pt_prior.md"),
             "Multiple observations" => joinpath("manual", "multiple_observations.md"),
+            "Observation schemes" => joinpath("manual", "observation_schemes.md"),
             "Utility fuctions" => joinpath("manual", "utility_functions.md"),
         ],
         "How to..." => Any[

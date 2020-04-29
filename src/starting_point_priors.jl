@@ -2,13 +2,19 @@
     StartingPtPrior
 
 Types inheriting from the abstract type `StartingPtPrior` indicate the prior
-that is put on the starting point of the observed path following the dynamics
-of some stochastic differential equation.
+that is put on the starting point of the observed path of some stochastic
+process
 """
 abstract type StartingPtPrior{T} end
 
+#===============================================================================
+                            Struct definitions
+===============================================================================#
+
 """
-    KnownStartingPt{T} <: StartingPtPrior
+    struct KnownStartingPt{T} <: StartingPtPrior{T}
+        y::T
+    end
 
 Indicates that the starting point is known and stores its value in `y`
 """
@@ -18,17 +24,19 @@ struct KnownStartingPt{T} <: StartingPtPrior{T}
 end
 
 """
-    GsnStartingPt{T,S} <: StartingPtPrior
+    struct GsnStartingPt{T,S,TM} <: StartingPtPrior{T} where {S}
+        μ::T
+        Σ::S
+        Λ::S
+        μ₀::T
+        Σ₀::UniformScaling
+    end
 
 Indicates that the starting point is equipped with a Gaussian prior with
-mean `μ` and covariance matrix `Σ`. It also stores the most recently sampled
-white noise `z` used to compute the starting point and a precision matrix
-`Λ`:=`Σ`⁻¹. `μ₀` and `Σ₀` are the mean and covariance of the white noise
-
-    GsnStartingPt(μ::T, Σ::S)
-
-Base constructor. It initialises the mean `μ` and covariance `Σ` parameters and
-`Λ` is set according to `Λ`:=`Σ`⁻¹
+mean `μ` and covariance matrix `Σ` (and pre-computed precision `Λ`:=`Σ`⁻¹).
+Sampling is always done via non-centred parametrization, by sampling white noise
+`z` according to Gaussian with zero mean and identity covariance: `μ₀` and `Σ₀`,
+and then transforming `z` to a variable with mean and covariance `μ` and `Σ`.
 """
 struct GsnStartingPt{T,S,TM} <: StartingPtPrior{T} where {S}
     μ::T
@@ -46,13 +54,21 @@ struct GsnStartingPt{T,S,TM} <: StartingPtPrior{T} where {S}
     ) where {T,S,TM} = new{T,S,TM}(μ, Σ, Λ, μ₀, Σ₀)
 end
 
+"""
+    GsnStartingPt(μ::T, Σ::S)
+
+Base constructor of GsnStartingPt. It initialises the mean `μ` and covariance
+`Σ` parameters and `Λ` is set according to `Λ`:=`Σ`⁻¹
+"""
 GsnStartingPt(μ, Σ) = GsnStartingPt(μ, Σ, ismutable(μ))
 
 function GsnStartingPt(μ::T, Σ, ::Val{true}) where T
     typeof(Σ) <: Vector && length(Σ) == 1 && (Σ = reshape(Σ, 1, 1))
     ismutable(Σ)::Val{true}
     @assert size(Σ,1) == size(Σ,2) == length(μ)
-    GsnStartingPt{T,typeof(Σ),:mutable}(μ, Σ, inv(Σ), zeros(eltype(T), length(μ)), I)
+    GsnStartingPt{T,typeof(Σ),:mutable}(
+        μ, Σ, inv(Σ), zeros(eltype(T), length(μ)), I
+    )
 end
 
 function GsnStartingPt(μ::T, Σ, ::Val{false}) where T
@@ -62,31 +78,52 @@ function GsnStartingPt(μ::T, Σ, ::Val{false}) where T
     GsnStartingPt{T,typeof(Σ),:immutable}(μ, Σ, inv(Σ), zero(T), I)
 end
 
+#===============================================================================
+                Sampling a starting point according to a prior
+===============================================================================#
 
 """
-    rand(G::GsnStartingPt, ρ)
+    rand([rng::Random.AbstractRNG], G::GsnStartingPt, z, ρ=0.0)
 
 Sample new white noise using Crank-Nicolson scheme with memory parameter `ρ` and
 a previous value of the white noise stored inside object `G`
 """
-rand(G::GsnStartingPt) = rand(Gaussian(G.μ, G.Σ))
-
-function rand(G::GsnStartingPt, z, ρ=0.0)
-    zᵒ = rand(Gaussian(G.μ₀, G.Σ₀))
+function Base.rand(rng::Random.AbstractRNG, G::GsnStartingPt, z, ρ=0.0)
+    zᵒ = rand(rng, Gaussian(G.μ₀, G.Σ₀))
     sqrt(1-ρ)*zᵒ + sqrt(ρ)*z # preconditioned Crank-Nicolson
 end
 
-"""
-    rand(G::KnownStartingPt, ::Any)
-
-If starting point is known then nothing can be sampled, using convention of
-returning the known startin point
-"""
-rand(G::KnownStartingPt, ::Any=nothing, ::Any=nothing) = G.y
+Base.rand(G::GsnStartingPt, z, ρ=0.0) = rand(Random.GLOBAL_RNG, G, z, ρ)
 
 
 """
-    start_pt(G::GsnStartingPt, P)
+    rand([rng::Random.AbstractRNG], G::GsnStartingPt)
+
+Sample new starting point according to its prior distribution.
+"""
+function Base.rand(rng::Random.AbstractRNG, G::GsnStartingPt)
+    rand(rng, Gaussian(G.μ, G.Σ))
+end
+
+Base.rand(G::GsnStartingPt) = rand(Random.GLOBAL_RNG, Gaussian(G.μ, G.Σ))
+
+"""
+    rand([rng::Random.AbstractRNG], G::KnownStartingPt, args...)
+
+Starting point is known. Nothing can be sampled. Returning known starting point.
+"""
+function Base.rand(rng::Random.AbstractRNG, G::KnownStartingPt, args...)
+    rand(Random.GLOBAL_RNG, G, args...)
+end
+
+Base.rand(G::KnownStartingPt, args...) = G.y
+
+#===============================================================================
+                Compute the starting point from random seed
+===============================================================================#
+
+"""
+    start_pt(z, G::GsnStartingPt, P)
 
 Compute a new starting point from the white noise for a given posterior
 distribution obtained from combining prior `G` and the likelihood encoded by the
@@ -100,7 +137,7 @@ function start_pt(z, G::GsnStartingPt, P)
 end
 
 """
-    start_pt(G::GsnStartingPt, P)
+    start_pt(z, G::GsnStartingPt)
 
 Compute a new starting point from the white noise for a given prior
 distribution `G`
@@ -108,7 +145,7 @@ distribution `G`
 start_pt(z, G::GsnStartingPt) = unwhiten(G.Σ, z) + G.μ
 
 """
-    start_pt(G::KnownStartingPt, P)
+    start_pt(z, G::KnownStartingPt, P)
 
 Return starting point
 """
@@ -119,7 +156,11 @@ start_pt(z, G::KnownStartingPt, P) = G.y
 
 Return starting point
 """
-start_pt(z, G::KnownStartingPt) = G.y
+start_pt(G::KnownStartingPt, P) = G.y
+
+#===============================================================================
+                Compute the random seed from the starting point
+===============================================================================#
 
 """
     inv_start_pt(y, G::GsnStartingPt, P)
@@ -147,12 +188,16 @@ returning `y`
 """
 inv_start_pt(y, G::KnownStartingPt, P) = y
 
+#===============================================================================
+                            compute logpdf
+===============================================================================#
+
 """
     logpdf(::KnownStartingPt, y)
 
 Nothing to do so long as `y` is equal to the known starting point inside `G`
 """
-function logpdf(G::KnownStartingPt, y)
+function Distributions.logpdf(G::KnownStartingPt, y)
     (G.y == y) ? 0.0 : error("Starting point is known, but a different value ",
                              "was passed to logpdf.")
 end
@@ -163,4 +208,4 @@ end
 
 log-probability density function evaluated at `y` of a prior distribution `G`
 """
-logpdf(G::GsnStartingPt, y) = logpdf(Gaussian(G.μ, G.Σ), y)
+Distributions.logpdf(G::GsnStartingPt, y) = logpdf(Gaussian(G.μ, G.Σ), y)

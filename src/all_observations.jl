@@ -10,7 +10,18 @@ const _PARAM_DEPEND_ENTRY_TYPE = (
         }
     }
 )
+
+const _LAW_OBS_DEPEND_ENTRY_TYPE = (
+    NamedTuple{
+        (:global_idx,:pname,:local_idx),
+        Tuple{Int64,Symbol,Int64}
+    }
+)
+
 const _PARAM_DEPEND_TYPE = Dict{Symbol,_PARAM_DEPEND_ENTRY_TYPE}
+const _LAW_DEPEND_TYPE = Vector{Vector{_LAW_OBS_DEPEND_ENTRY_TYPE}}
+const _OBS_DEPEND_TYPE = Vector{Vector{Vector{_LAW_OBS_DEPEND_ENTRY_TYPE}}}
+
 
 #NOTE this function must be overwritten from `Main`.
 parameter_names(::Any) = nothing
@@ -41,6 +52,9 @@ diffusions laws used to generate the recorded data is kept.
 struct AllObservations
     recordings::Vector{Any}
     param_depend::_PARAM_DEPEND_TYPE
+    idx_to_param::Dict{Int64,Symbol}
+    law_depend::_LAW_DEPEND_TYPE
+    obs_depend::_OBS_DEPEND_TYPE
 
     function AllObservations(;
             P=nothing,
@@ -49,14 +63,26 @@ struct AllObservations
             x0_prior=nothing
         )
         nothing_passed = all([v===nothing for v in [P, obs, t0, x0_prior]])
-        nothing_passed && return new{}([],_PARAM_DEPEND_TYPE())
+        nothing_passed && return new{}(
+            [],
+            _PARAM_DEPEND_TYPE(),
+            Dict{Int64,Symbol}(),
+            _LAW_DEPEND_TYPE(undef,0),
+            _OBS_DEPEND_TYPE(undef,0)
+        )
         @assert all([v!=nothing for v in [P, obs, t0, x0_prior]])
         AllObservations((P=P,obs=obs,t0=t0,x0_prior=x0_prior))
     end
 
     function AllObservations(recording::NamedTuple)
         check_recording_format(recording)
-        new{}([recording], _PARAM_DEPEND_TYPE())
+        new{}(
+            [recording],
+            _PARAM_DEPEND_TYPE(),
+            Dict{Int64,Symbol}(),
+            _LAW_DEPEND_TYPE(undef,0),
+            _OBS_DEPEND_TYPE(undef,0)
+        )
     end
 end
 
@@ -101,6 +127,8 @@ function add_dependency!(all_obs::AllObservations, dep::Dict)
 
         else
             all_obs.param_depend[key] = _PARAM_DEPEND_ENTRY_TYPE(undef, 0)
+            num_entries = length(keys(all_obs.idx_to_param))
+            all_obs.idx_to_param[num_entries+1] = key
         end
         for v in dep[key]
             push!(
@@ -192,8 +220,6 @@ function format_law_dep_entry(P, entry::Tuple{Int64,Bool,Int64,Int64,Symbol})
     format_law_dep_entry(P, (entry[[1,2,4,5]]...,))
 end
 
-
-
 """
     initialize!(all_obs::AllObservations)
 
@@ -218,6 +244,8 @@ function initialize!(all_obs::AllObservations)
         )
     end
     new_param_dependence!(out, all_obs.param_depend, old_to_new_idx, old_to_new_obs_idx)
+
+    obs_and_law_dependence_table!(out)
     out, old_to_new_idx
 end
 
@@ -358,4 +386,84 @@ function new_param_dependence!(out, old_dep, old_to_new_idx, old_to_new_obs_idx)
         new_dep[key] = new_entry
     end
     add_dependency!(out, new_dep)
+end
+
+function get_dep(all_obs::AllObservations, coord)
+    p_name = all_obs.idx_to_param[coord]
+    dep = all_obs.param_depend[p_name]
+end
+
+function obs_and_law_dependence_table!(all_obs::AllObservations)
+    all_global_coords = sort(collect(keys(all_obs.idx_to_param))) # should be [1,2,...,N] say
+
+    num_rec = length(all_obs.recordings)
+    resize!(all_obs.law_depend, num_rec)
+    resize!(all_obs.obs_depend, num_rec)
+
+    for (i,r) in enumerate(all_obs.recordings)
+        all_obs.law_depend[i] = construct_law_i_dependency(all_obs, all_global_coords, i)
+        num_obs_i = length(r.obs)
+        all_obs.obs_depend[i] = _LAW_DEPEND_TYPE(undef, num_obs_i)
+        for j in 1:num_obs_i
+            all_obs.obs_depend[i][j] = construct_obs_ij_dependency(all_obs, all_global_coords, i, j)
+        end
+    end
+end
+
+function construct_law_i_dependency(all_obs::AllObservations, coords, i)
+    law_i_global_coords_idx = filter(
+        c_i->any(
+            x->(x.rec_idx == i && x.law_else_obs),
+            get_dep(all_obs, coords[c_i])
+        ),
+        1:length(coords)
+    )
+
+    law_i_relevant = map(
+        c_i->filter(
+            x->(x.rec_idx == i && x.law_else_obs),
+            get_dep(all_obs, coords[c_i])
+        ),
+        law_i_global_coords_idx
+    )
+    @assert all(length.(law_i_relevant) .== 1)
+    law_i_relevant = first.(law_i_relevant)
+
+    map(
+        x->(
+            global_idx = coords[x[2]],
+            pname = x[1].param_name,
+            local_idx = x[1].param_idx,
+        ),
+        zip(law_i_relevant, law_i_global_coords_idx)
+    )
+end
+
+function construct_obs_ij_dependency(all_obs::AllObservations, coords, i, j)
+    obs_ij_global_coords_idx = filter(
+        c_i->any(
+            x->(x.rec_idx == i && !x.law_else_obs && x.obs_idx == j),
+            get_dep(all_obs, coords[c_i])
+        ),
+        1:length(coords)
+    )
+
+    obs_ij_relevant = map(
+        c_i->filter(
+            x->(x.rec_idx == i && !x.law_else_obs && x.obs_idx == j),
+            get_dep(all_obs, coords[c_i])
+        ),
+        obs_ij_global_coords_idx
+    )
+    @assert all(length.(obs_ij_relevant) .== 1)
+    obs_ij_relevant = first.(obs_ij_relevant)
+
+    map(
+        x->(
+            global_idx = coords[x[2]],
+            pname = x[1].param_name,
+            local_idx = x[1].param_idx,
+        ),
+        zip(obs_ij_relevant, obs_ij_global_coords_idx)
+    )
 end

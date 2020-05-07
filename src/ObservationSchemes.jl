@@ -20,6 +20,7 @@ module ObservationSchemes
     include("all_observations.jl")
     include("obs_scheme.jl")
     include("convenience_functions.jl")
+    include("reparameterizations.jl")
 
     # starting_point_priors.jl
     export KnownStartingPt, GsnStartingPt

@@ -1,10 +1,11 @@
 # [Defining observation schemes and loading data](@id obs_scheme)
+**********************
 Most often we collect multiple data points from a single observation scheme. Decorating each and single one of the observations as in the previous section might become quite tiring. To this end we provide a struct `ObsScheme` together with a function `load_data` for a convenient way of decorating multiple observations at once.
 ```@docs
 ObservationSchemes.ObsScheme
 ObservationSchemes.load_data
 ```
-For instance, if all data is collect according to a single observation scheme:
+For instance, if all data is collected according to a single observation scheme:
 ```julia
 t, v = 1.0, [1.0, 2.0, 3.0] # dummy values, only DataType matter
 obs = LinearGsnObs(t, v; full_obs=true)

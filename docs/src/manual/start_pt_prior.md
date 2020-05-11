@@ -1,5 +1,6 @@
 # Priors over starting points
-The intention behind this package is to provide a complete infrastructure for defining observations for stochastic processes (though, it can find use for defining observations in other settings). Consequently, on top of decorating each observation with appropriate information, one often needs to specify some additional information regarding the starting point. This is because often no observations are made at the initial time, but we still wish to conveys our prior knowledge of where the point lies via prior distributions. For this reason the starting points are always treated differently to observations and this package provides an infrastructure for specifying priors over starting points.
+*****************************
+On top of decorating each observation with appropriate information, for stochastic processes we need to provide additional information that describes the starting position of the process (as, for instance, no observation may be made at the initial time). This is done through prior distributions.
 
 All priors over starting points inherit from
 ```@docs

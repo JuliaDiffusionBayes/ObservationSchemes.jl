@@ -27,26 +27,42 @@ const _OBS_DEPEND_TYPE = Vector{Vector{Vector{_LAW_OBS_DEPEND_ENTRY_TYPE}}}
 parameter_names(::Any) = nothing
 
 """
-    AllObservations
+    struct AllObservations
+        recordings::Vector{Any}
+        param_depend::_PARAM_DEPEND_TYPE
+        idx_to_param::Dict{Int64,Symbol}
+        law_depend::_LAW_DEPEND_TYPE
+        obs_depend::_OBS_DEPEND_TYPE
+    end
 
 A struct gathering multiple observations of a diffusion processes. Additionaly,
 the interdependence structure between parameters shared between various
-diffusions laws used to generate the recorded data is kept.
+diffusions laws used to generate the recorded data is kept. `recordings`
+collects all recordings, `param_depend` is a dictionary with keys—parameter
+labels—and values—vectors with entries that list which laws and observations
+depend on a corresponding parameter. `idx_to_param` for numbers going from 1 to
+`number-of-parameters` associates a parameter label. `law_depend` gives for each
+law in `recordings` a list of parameters that it depends on (with `global_idx`
+specifying the index of a parameter as encoded by `idx_to_param`, `pname` its
+name as encoded internally by the law and `local_idx` the position of a
+parameter as encoded internally by the law). `obs_depend` does the same as
+`law_depend`, but for each observation.
 
-        AllObservations(;P=nothing, obs=nothing)
 
-    Default constructor creating either an empty `AllObservations` object,
-    or initiates it immediately with a single recording where the target comes
-    from the law `P`, the observations are stored in `obs` and the observed
-    process was started at time `t0` from som position which we put a prior on
-    `x0_prior`.
+    AllObservations(;P=nothing, obs=nothing, t0=nothing, x0_prior=nothing)
 
-        AllObservations(recording::NamedTuple)
+Default constructor creating either an empty `AllObservations` object,
+or initiating it immediately with a single recording where the target comes
+from the law `P`, the observations are stored in `obs` and the observed
+process was started at time `t0` from som position which we put a prior on
+`x0_prior`.
 
-    Constructor creating an `AllObservations` object and initiating it
-    immediately with a single recording where the target comes
-    from the law `recording.P`, the observations are stored in `recording.obs`
-    and the starting point is at time `recording.t0` and has a prior `x0_prior`.
+    AllObservations(recording::NamedTuple)
+
+Constructor creating an `AllObservations` object and initiating it
+immediately with a single recording where the target comes
+from the law `recording.P`, the observations are stored in `recording.obs`
+and the starting point is at time `recording.t0` and has a prior `x0_prior`.
 
 """
 struct AllObservations
@@ -221,13 +237,16 @@ function format_law_dep_entry(P, entry::Tuple{Int64,Bool,Int64,Int64,Symbol})
 end
 
 """
-    initialize!(all_obs::AllObservations)
+    initialize(all_obs::AllObservations)
 
 Split the recordings at the times of full observations to make full use of the
-Markov property (and make the code readily parallelisable).
+Markov property (and make the code readily parallelisable). Introduce all
+parameters that were not mentioned in the current dependency dictionary. Create
+dictionaries that allow for efficient retreival of all laws and observations
+that depend on any specified parameter
 """
-function initialize!(all_obs::AllObservations)
-    fill_dependency_for_unspec_params!(all_obs)
+function initialize(all_obs::AllObservations)
+    full_param_depend = fill_dependency_for_unspec_params(all_obs)
     out = AllObservations()
     old_to_new_idx = Dict{Int64,Vector{Int64}}()
     old_to_new_obs_idx = Dict{Int64,Dict{Int64,Int64}}()
@@ -243,19 +262,19 @@ function initialize!(all_obs::AllObservations)
             old_to_new_obs_idx
         )
     end
-    new_param_dependence!(out, all_obs.param_depend, old_to_new_idx, old_to_new_obs_idx)
+    new_param_dependence!(out, full_param_depend, old_to_new_idx, old_to_new_obs_idx)
 
     obs_and_law_dependence_table!(out)
     out, old_to_new_idx
 end
 
 """
-    fill_dependency_for_unspec_params!(all_obs::AllObservations)
+    fill_dependency_for_unspec_params(all_obs::AllObservations)
 
 Fill the `all_obs.depen_param` dictionary with all parameters that are not
 shared between recordings.
 """
-function fill_dependency_for_unspec_params!(all_obs::AllObservations)
+function fill_dependency_for_unspec_params(all_obs::AllObservations)
     accounted_for_entries = Iterators.flatten(values(all_obs.param_depend))
     new_entries = _PARAM_DEPEND_TYPE()
     for (rec_idx, recording) in enumerate(all_obs.recordings)
@@ -291,7 +310,7 @@ function fill_dependency_for_unspec_params!(all_obs::AllObservations)
             end
         end
     end
-    merge!(all_obs.param_depend, new_entries)
+    merge(all_obs.param_depend, new_entries)
 end
 
 
@@ -393,6 +412,12 @@ function get_dep(all_obs::AllObservations, coord)
     dep = all_obs.param_depend[p_name]
 end
 
+"""
+    obs_and_law_dependence_table!(all_obs::AllObservations)
+
+Create containers that associate to each law an observation a list of parameters
+that they depend on.
+"""
 function obs_and_law_dependence_table!(all_obs::AllObservations)
     all_global_coords = sort(collect(keys(all_obs.idx_to_param))) # should be [1,2,...,N] say
 

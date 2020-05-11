@@ -1,15 +1,25 @@
 # [Observation schemes](@id manual_start)
-All observation schemes inherit from a struct `Observation{D,T}` and have
-methods `eltype`, `size` and `length` implemented for them. They can be used to decorate each recorded data-point and in doing so encode the way in which it was collected.
+************************************************
+All observation schemes inherit from
+```@docs
+ObservationSchemes.Observation
+```
+and must have methods
+```@docs
+ObservationSchemes.eltype
+ObservationSchemes.size
+ObservationSchemes.length
+```
+implemented for them. The idea is to decorate each recorded data-point with such structs, and in doing so, encode the way in which it was collected.
 
-The following structs have been defined in `ObservationSchemes.jl` to define a single observation:
+We implemented two concrete structs that may be used for defining a single observation:
 - `LinearGsnObs`: to encode observations of the linear transformations of the underlying process disturbed by Gaussian noise
-- `LinearNonGsnObs`: to encode observations of the linear transformations of the underlying process disturbed by noise other than Gaussian
-- `GeneralObs`: to encode observations of non-linear transformations of the underlying process disturbed by noise
+- `GeneralObs`: to encode observations of non-linear transformations of the underlying process disturbed by noise.
 
-All of the above admit a possibility of parameterization.
+Both admit a possibility of parameterization.
 
 ## Linear Gaussian struct
+-----------------------------------
 The most important observation scheme is `LinearGsnObs`.  It is suitable for representing observations that can be written in the following format:
 ```math
 \begin{equation}\label{eq:obs_scheme}
@@ -72,7 +82,7 @@ julia> summary(obs)
 |No first passage times recorded.
 ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆
 ```
-Note in particular, notice that various defaults and type-inference has kicked in. It was recognized that the observation does not depend on any parameters, that first-passage time setting does not apply and that the observation was a mutable type and hence regular `Arrays` are used to define `L`, `μ` and `Σ`.
+Notice that various defaults and type-inferences have kicked in. It was recognized that the observation does not depend on any parameters, that first-passage time setting does not apply and that the observation was a mutable type and hence regular `Arrays` are used to define `L`, `μ` and `Σ`.
 
 
 ### [Linear transformations of the process disturbed by Gaussian noise](@id standard_example_lingsnobs)
@@ -117,9 +127,9 @@ julia> summary(obs)
 |No first passage times recorded.
 ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆
 ```
-Note that the internal containers are now set to be `SVector`s (even `μ` that was not passed but its type was inferred and values set to zero). Additionally, Julia understands that this is not a full observation and hence Markov property cannot be applied.
+Note that the internal containers are now set to be `SVector`s (even `μ`, which wasn't passed to a constructor but its type was inferred and its value set to zero). Additionally, Julia understands that this is not a full observation and hence Markov property cannot be applied.
 
-### First-passage time observations
+### [First-passage time observations](@id first_passage_time)
 Support for certain first-passage time settings is provided. By default `LinearGsnObs` sets the first-passage time info to `NoFirstPassageTimes`. However, this can be changed. For instance, to
 indicate in the example above that the last coordinate of `v` actually reaches
 level $3.0$ for the very first time at time $1.0$ we can specify the following:
@@ -176,7 +186,8 @@ changes appropriately to display the new summary of the first-passage time infor
     In practice, all other observation schemes are handled by approximating them with a suitable `LinearGsnObs` and then correcting the resulting approximation error with Metropolis-Hastings steps. Consequently, `LinearGsnObs` will be a building block of any other observation scheme.
 
 ## Parameterizing `LinearGsnObs`
-The observations can be parameterized by passing a vector of parameters `θ`. Additionally, a `Tag` needs to be attached that is used to differentiate at the compile time between the non-parameterized observations and parameterized observations as well as among different parameterizations themselves.
+---------------------------------
+The observations can be parameterized by passing a vector of parameters `θ`. Additionally, a `Tag` needs to be attached that is used to differentiate at compile time between the non-parameterized observations and parameterized observations as well as among different parameterizations themselves.
 
 For instance, to indicate in the [second example](@ref standard_example_lingsnobs) that two entries in the `L` matrix are parameterized we can write:
 ```julia
@@ -186,7 +197,7 @@ L = @SMatrix [1.0 0.0 -99.9 0.0; 3.0 4.0 0.0 0.0; 0.0 -99.9 0.0 1.0]
 Σ = SDiagonal(1.0, 1.0, 1e-11)
 obs = LinearGsnObs(t, v; L = L, Σ = Σ, θ=[2.0, 1.0], Tag=1)
 ```
-We are not done yet, in this case matrix `L` that we passed above is incomplete as we intend to create an actual matrix `L` by combining the matrix and the parameters we've passed. To this end, we must overwrite the behaviour of `L` function:
+We are not done yet, in this case matrix `L` that we passed above is incomplete as we intend to create an actual matrix `L` by combining the matrix and the parameters we've passed. To this end, we must overwrite the behaviour of the function `L(⋅)`:
 ```julia
 const OBS = ObservationSchemes
 function OBS.L(o::LinearGsnObs{1})
@@ -249,7 +260,7 @@ julia> summary(obs)
 !!! note
     We used number `-99.9` just to remind ourselves that entries with this number need to be overwritten by parameters. There are however no rules or enforcements as to how the user deals with such entries.
 
-Notice that trying to access `L` via `obs.L` will give you an incorrect result. To avoid such mistakes, always query `L`, `μ`, `obs` (with alias `ν`) and `Σ` via accessors:
+Notice that trying to access `L` via `obs.L` will give you an incorrect result. To avoid such mistakes, always query `L`, `μ`,`Σ` and `obs` via accessors:
 ```@docs
 ObservationSchemes.L
 ObservationSchemes.μ
@@ -259,6 +270,7 @@ ObservationSchemes.obs
 ```
 
 ## Non-linear, non-Gaussian observations
+----------------------------------------
 In principle, any observation types are supported, but this comes at a cost of having to provide some information explicitly. The main struct for specifing general observation schemes is
 ```@docs
 ObservationSchemes.GeneralObs

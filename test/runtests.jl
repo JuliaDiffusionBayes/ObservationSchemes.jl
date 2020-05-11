@@ -165,7 +165,7 @@ end
             @test all_obs.recordings[i] == recordings[i]
         end
 
-        initialized_obs, old_to_new_dict = initialize!(all_obs)
+        initialized_obs, old_to_new_dict = initialize(all_obs)
         d = initialized_obs.param_depend
         @testset "new α dependence $i" for i in 1:4
             @test Tuple(d[:α][i]) == (i, true, -1, 1, :α)
@@ -376,7 +376,7 @@ end
     @test all_obs.recordings[i] == recordings[i]
 end
 
-initialized_obs, old_to_new_dict = initialize!(all_obs)
+initialized_obs, old_to_new_dict = initialize(all_obs)
 d = initialized_obs.param_depend
 @testset "new α dependence $i" for i in 1:4
     @test Tuple(d[:α][i]) == (i, true, -1, 1, :α)

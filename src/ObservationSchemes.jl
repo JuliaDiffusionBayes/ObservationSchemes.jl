@@ -35,7 +35,7 @@ module ObservationSchemes
     export GeneralObs
 
     # all_observations.jl
-    export AllObservations, add_recording!, add_dependency!, initialize!
+    export AllObservations, add_recording!, add_dependency!, initialize
 
     # obs_scheme.jl
     export ObsScheme, load_data

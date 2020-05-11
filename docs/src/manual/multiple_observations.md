@@ -1,4 +1,5 @@
 # Multiple observations
+**********************
 In practice, we gather multiple observations of a single trajectory of a stochastic process. In this package, we refer to multiple discrete-time observations of a single trajectory as a single **recording**. We do not enforce any structure on a single recording and instead use a convention of using an appropriate `NamedTuple`. However, when combining **multiple recordings** into a single data object `AllObservations` it is expected that each **recording** follows the said convention.
 
 Below we describe how to handle observations of
@@ -7,6 +8,7 @@ Below we describe how to handle observations of
 - multiple recordings from multiple laws
 
 ## Defining a single recording
+-------------------------------
 To fully describe a single recording we need four elements:
 - The law of the underlying stochastic process
 - A starting time
@@ -33,6 +35,7 @@ being of the type inheriting from `Observation{D,T}`. `x0_prior` is assumed
 to inherit from `StartingPtPrior{T}`.
 
 ## Defining multiple recordings
+-------------------------------
 A struct `AllObservations` allows for a systematic definition of multiple
 recordings and, in addition, provides some handy functionality.
 ```@docs
@@ -98,7 +101,7 @@ The first (respectively second) entry in the dictionary tells `all_obs` that
 there is a parameter, which from now on will be labeled `:α_shared` (resp.
 `:β_shared`), that is present in the law of recording `1` and the law of
 recording `2` and in both of these cases if one calls `parameter_names(P)` then the
-referred to parameter should have a name `:α` (resp. `:β`). The flag `law_else_obs` indicates that the parameters refer to those in the definition of a law, not the observations. We can also tell the same thing to `AllObservations` object differently:
+referred to parameter should have a name `:α` (resp. `:β`). The flag `law_else_obs` indicates that the referred to parameter is placed in the definition of a law, and not in the definition of a parameterized observation. We can also tell the same thing to `AllObservations` object differently:
 ```julia
 add_dependency!(
     all_obs,
@@ -119,13 +122,18 @@ the same parameter.
     * `(rec=..., p_idx=..., p_name=...)`
     above don't matter (in fact they are later downgraded to regular `tuples`), only the order of their entries.
 
-Now, we can additionally call:
-```julia
-initialised_all_obs, old_to_new_idx = initialize!(all_obs)
+Now, we can additionally call
+```@docs
+ObservationSchemes.initialize
 ```
-to perform two useful operations.
+as in:
+```julia
+initialised_all_obs, old_to_new_idx = initialize(all_obs)
+```
+to perform three useful operations.
 1. First, all parameters that are not shared between various laws will be marked (here, there is no such parameter, so this step does not do anything, see example below which illustrates this idea),
 2. Second, the recordings are split at the times at which full observations are made, as full observations allows for employment of Markov property and treatment of the problem in parallel. As a result, `initialised_all_obs` now has `5` recordings, all coming from the same law `LawA`.
+3. Third, an additional dependence structure is introduced that allows for efficient retrieval of information about parameter dependence when iterating through laws and observations.
 
 !!! tip
     The `old_to_new_idx` might be helpful for keeping track of the original indices of recordings.
@@ -163,9 +171,9 @@ add_dependency!(
     )
 )
 ```
-where, notice presence of additional `(rec=3, law_else_obs=true, p_name=:β)`. Now, calling
+where, notice presence of additional `(rec=3, law_else_obs=true, p_name=:β)`. This time, calling
 ```julia
-initialised_all_obs, _ = initialize!(all_obs)
+initialised_all_obs, _ = initialize(all_obs)
 ```
 not only splits the recordings at the time of full observations (resulting in
 `6` independent recordings), but also introduces a new named parameter

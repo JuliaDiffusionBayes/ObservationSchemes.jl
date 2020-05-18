@@ -65,7 +65,7 @@ end
     build_recording(
             ::Type{K}, tt, observs::Vector, P, t0, x0_prior; kwargs...
         ) where K
-Utility function to build a recording that follows the convention adopted in 
+Utility function to build a recording that follows the convention adopted in
 package ObservationSchemes.
 """
 function build_recording(
@@ -188,7 +188,9 @@ function setup_time_grids(
         @assert already_arranged_tt[1] == t0 && already_arranged_tt[end] == T;
         return already_arranged_tt
     )
-    tt = eltype.(τ(collect(t0:dt:T)))
+    _tt = collect(t0:dt:T)
+    _tt[end] == T || append!(_tt, [T])
+    tt = eltype.(τ(_tt))
 end
 
 """

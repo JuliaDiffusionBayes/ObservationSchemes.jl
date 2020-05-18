@@ -34,3 +34,10 @@ end
 function set_parameters!(obs::Observation, ξ, η°idx, ::Val{:associate_by_name})
     error("cannot set_parameters! for observations via parameter name association")
 end
+
+function set_parameters!(obs::Observation, η)
+    for i in eachindex(obs.θ, η)
+        obs.θ[i] = η[i]
+    end
+    obs
+end

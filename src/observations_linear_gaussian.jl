@@ -153,7 +153,7 @@ Return the observation
 
 Alias to ν. Return the observation.
 """
-obs = ν
+const obs = ν
 
 
 clone(o::LinearGsnObs{0}, args...) = o

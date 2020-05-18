@@ -64,9 +64,14 @@ function load_data(::Any, os::ObsScheme, tt_xx::Vector)
 end
 
 function obs_from_template(obs, tmp::LinearGsnObs)
+    o = (
+        typeof(obs[2]) <: Number && typeof(tmp.obs) <: AbstractArray ?
+        [obs[2]] :
+        obs[2]
+    )
     LinearGsnObs(
         obs[1],
-        convert(typeof(tmp.obs), obs[2]),
+        convert(typeof(tmp.obs), o),
         deepcopy(tmp.L),
         deepcopy(tmp.Σ),
         deepcopy(tmp.μ),

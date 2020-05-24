@@ -168,5 +168,5 @@ function update_params!(o::LinearGsnObs, new_params...)
     o
 end
 
-parameter_names(o::Observation) = tuple()
+var_parameter_pos(o::Observation) = tuple()
 parameters(o::Observation) = tuple(o.θ...)

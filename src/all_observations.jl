@@ -2,52 +2,35 @@
     Defines a container for multiple recordings of discrete-time observations
     of diffusion processes. The main object is `AllObservations`
 =#
-const _PARAM_DEPEND_ENTRY_TYPE = (
-    Vector{
-        NamedTuple{
-            (:rec_idx,:law_else_obs,:obs_idx,:param_idx,:param_name),
-            Tuple{Int64,Bool,Int64,Int64,Symbol}
-        }
-    }
-)
-
-const _LAW_OBS_DEPEND_ENTRY_TYPE = (
-    NamedTuple{
-        (:global_idx,:pname,:local_idx),
-        Tuple{Int64,Symbol,Int64}
-    }
-)
+const _PARAM_DEPEND_ENTRY_TYPE = Vector{Pair{Int64, Symbol}}
+const _OBS_DEPEND_ENTRY_TYPE = Vector{Tuple{Int64,Int64,Int64}}
 
 const _PARAM_DEPEND_TYPE = Dict{Symbol,_PARAM_DEPEND_ENTRY_TYPE}
-const _LAW_DEPEND_TYPE = Vector{Vector{_LAW_OBS_DEPEND_ENTRY_TYPE}}
-const _OBS_DEPEND_TYPE = Vector{Vector{Vector{_LAW_OBS_DEPEND_ENTRY_TYPE}}}
+const _OBS_DEPEND_TYPE = Dict{Symbol,_OBS_DEPEND_ENTRY_TYPE}
 
+const _PARAM_REV_DEPEND_TYPE = Vector{Vector{Tuple{Symbol,Symbol}}}
+const _OBS_REV_DEPEND_TYPE = Vector{Vector{Vector{Tuple{Symbol,Int64}}}}
 
 #NOTE this function must be overwritten from `Main`.
-parameter_names(::Any) = nothing
+var_parameter_names(::Any) = nothing
 
 """
     struct AllObservations
         recordings::Vector{Any}
-        param_depend::_PARAM_DEPEND_TYPE
-        idx_to_param::Dict{Int64,Symbol}
-        law_depend::_LAW_DEPEND_TYPE
-        obs_depend::_OBS_DEPEND_TYPE
+        param_depend::Dict{Symbol,Vector{Pair{Int64, Symbol}}}
+        obs_depend::Dict{Symbol,Vector{Tuple{Int64,Int64,Int64}}}
+        param_depend_rev::Vector{Vector{Tuple{Symbol,Symbol}}}
+        obs_depend_rev::Vector{Vector{Vector{Tuple{Symbol,Int64}}}}
     end
 
 A struct gathering multiple observations of a diffusion processes. Additionaly,
 the interdependence structure between parameters shared between various
 diffusions laws used to generate the recorded data is kept. `recordings`
 collects all recordings, `param_depend` is a dictionary with keys—parameter
-labels—and values—vectors with entries that list which laws and observations
-depend on a corresponding parameter. `idx_to_param` for numbers going from 1 to
-`number-of-parameters` associates a parameter label. `law_depend` gives for each
-law in `recordings` a list of parameters that it depends on (with `global_idx`
-specifying the index of a parameter as encoded by `idx_to_param`, `pname` its
-name as encoded internally by the law and `local_idx` the position of a
-parameter as encoded internally by the law). `obs_depend` does the same as
-`law_depend`, but for each observation.
-
+labels—and values—vectors with entries that list which laws depend on a
+corresponding parameter. `obs_depend` does the same but for observations.
+`param_depend_rev` gives for each law a list of (variable) parameters it depends
+on and `obs_depend_rev` does the same but for the observations.
 
     AllObservations(;P=nothing, obs=nothing, t0=nothing, x0_prior=nothing)
 
@@ -63,14 +46,13 @@ Constructor creating an `AllObservations` object and initiating it
 immediately with a single recording where the target comes
 from the law `recording.P`, the observations are stored in `recording.obs`
 and the starting point is at time `recording.t0` and has a prior `x0_prior`.
-
 """
 struct AllObservations
     recordings::Vector{Any}
     param_depend::_PARAM_DEPEND_TYPE
-    idx_to_param::Dict{Int64,Symbol}
-    law_depend::_LAW_DEPEND_TYPE
     obs_depend::_OBS_DEPEND_TYPE
+    param_depend_rev::_PARAM_REV_DEPEND_TYPE
+    obs_depend_rev::_OBS_REV_DEPEND_TYPE
 
     function AllObservations(;
             P=nothing,
@@ -78,15 +60,15 @@ struct AllObservations
             t0=nothing,
             x0_prior=nothing
         )
-        nothing_passed = all([v===nothing for v in [P, obs, t0, x0_prior]])
+        nothing_passed = all(v->v===nothing, [P, obs, t0, x0_prior])
         nothing_passed && return new{}(
             [],
             _PARAM_DEPEND_TYPE(),
-            Dict{Int64,Symbol}(),
-            _LAW_DEPEND_TYPE(undef,0),
-            _OBS_DEPEND_TYPE(undef,0)
+            _OBS_DEPEND_TYPE(),
+            _PARAM_REV_DEPEND_TYPE(undef,0),
+            _OBS_REV_DEPEND_TYPE(undef,0)
         )
-        @assert all([v!=nothing for v in [P, obs, t0, x0_prior]])
+        @assert all(v->v!=nothing, [P, obs, t0, x0_prior])
         AllObservations((P=P,obs=obs,t0=t0,x0_prior=x0_prior))
     end
 
@@ -95,12 +77,13 @@ struct AllObservations
         new{}(
             [recording],
             _PARAM_DEPEND_TYPE(),
-            Dict{Int64,Symbol}(),
-            _LAW_DEPEND_TYPE(undef,0),
-            _OBS_DEPEND_TYPE(undef,0)
+            _OBS_DEPEND_TYPE(),
+            _PARAM_REV_DEPEND_TYPE(undef,0),
+            _OBS_REV_DEPEND_TYPE(undef,0)
         )
     end
 end
+
 
 """
     check_recording_format(::T) where T<:NamedTuple
@@ -133,107 +116,54 @@ and observations used to generate various recordings stored in an observations
 container `all_obs`.
 """
 function add_dependency!(all_obs::AllObservations, dep::Dict)
-    existing_keys = keys(all_obs.param_depend)
+    existing_keys_param = keys(all_obs.param_depend)
+    existing_keys_obs = keys(all_obs.obs_depend)
     for key in keys(dep)
-        if key in existing_keys
-            println(
-                "Warning! depenendency for $key is already defined. ",
-                "Appending with new info..."
-            )
-
-        else
-            all_obs.param_depend[key] = _PARAM_DEPEND_ENTRY_TYPE(undef, 0)
-            num_entries = length(keys(all_obs.idx_to_param))
-            all_obs.idx_to_param[num_entries+1] = key
-        end
-        for v in dep[key]
-            push!(
-                all_obs.param_depend[key],
-                format_dep_entry(Val(v[2]), all_obs.recordings[v[1]], v)
-            )
-        end
+        add_a_single_dependency!(
+            all_obs,
+            key,
+            dep[key],
+            existing_keys_param,
+            existing_keys_obs
+        )
     end
 end
 
-"""
-    format_dep_entry(P, entry)
-
-Format an entry pointing to a specific parameter in a specific law used for a
-specific recording so that it encodes recording index `rec_idx`, parameter index
-`param_idx` and parameter name `param_name` of the pointing to position.
-"""
-format_dep_entry(::Val{true}, rec, entry) = format_law_dep_entry(rec.P, Tuple(entry))
-
-#TODO implement this is for observations...
-format_dep_entry(::Val{false}, rec, entry) = nothing
-
-"""
-    format_dep_entry(P, entry::Tuple{Int64,Int64})
-
-Infer recording index `rec_idx`, parameter index `param_idx` and parameter name
-`param_name` from the pair that lists recording index and parameter index within
-the law that was used for that recording.
-"""
-function format_law_dep_entry(P, entry::Tuple{Int64,Bool,Int64})
-    p_names = parameter_names(P)
-    r_idx, _, p_idx = entry
-    @assert length(p_names) >= p_idx
-
-    (
-        rec_idx=r_idx,
-        law_else_obs=true,
-        obs_idx=-1,
-        param_idx=p_idx,
-        param_name=p_names[p_idx]
+function add_a_single_dependency!(
+        all_obs::AllObservations,
+        key,
+        val::Vector{Tuple{Int64, Int64, Int64}},
+        ::Any,
+        existing_keys
     )
+    if key in existing_keys
+        println(
+            "Warning! depenendency for $key is already defined. ",
+            "Appending with new info..."
+        )
+    else
+        all_obs.obs_depend[key] = _OBS_DEPEND_ENTRY_TYPE(undef, 0)
+    end
+    push!(all_obs.obs_depend[key], val)
 end
 
-"""
-    format_dep_entry(P, entry::Tuple{Int64,Symbol})
-
-Infer recording index `rec_idx`, parameter index `param_idx` and parameter name
-`param_name` from the pair that lists recording index and parameter name within
-the law that was used for that recording.
-"""
-function format_law_dep_entry(P, entry::Tuple{Int64,Bool,Symbol})
-    p_names = parameter_names(P)
-    r_idx, _, p_name = entry
-    @assert p_name in p_names
-    p_idx = argmax(p_names .== p_name)
-
-    (
-        rec_idx=r_idx,
-        law_else_obs=true,
-        obs_idx=-1,
-        param_idx=p_idx,
-        param_name=p_name
+function add_a_single_dependency!(
+        all_obs::AllObservations,
+        key,
+        val::Vector{<:Union{Pair{Int64, Symbol}, Tuple{Int64, Symbol}}},
+        existing_keys,
+        ::Any
     )
-end
-
-"""
-    format_dep_entry(P, entry::Tuple{Int64,Int64,Symbol})
-
-Make sure that recording index `rec_idx`, parameter index `param_idx` and
-parameter name `param_name` make sense and are formatted correctly.
-"""
-function format_law_dep_entry(P, entry::Tuple{Int64,Bool,Int64,Symbol})
-    p_names = parameter_names(P)
-    r_idx, _, p_idx, p_name = entry
-    @assert p_name in p_names
-    @assert length(p_names) >= p_idx
-    @assert p_names[p_idx] == p_name
-
-    (
-        rec_idx=r_idx,
-        law_else_obs=true,
-        obs_idx=-1,
-        param_idx=p_idx,
-        param_name=p_name
-    )
-end
-
-function format_law_dep_entry(P, entry::Tuple{Int64,Bool,Int64,Int64,Symbol})
-    format_law_dep_entry(P, (entry[[1,2,4,5]]...,))
+    if key in existing_keys
+        println(
+            "Warning! depenendency for $key is already defined. ",
+            "Appending with new info..."
+        )
+    else
+        all_obs.param_depend[key] = _PARAM_DEPEND_ENTRY_TYPE(undef, 0)
+    end
+    foo(x)=Pair(x...)
+    append!(all_obs.param_depend[key], foo.(val))
 end
 
 """
@@ -246,10 +176,10 @@ dictionaries that allow for efficient retreival of all laws and observations
 that depend on any specified parameter
 """
 function initialize(all_obs::AllObservations)
-    full_param_depend = fill_dependency_for_unspec_params(all_obs)
+    full_p_dep, full_o_dep = fill_dependency_for_unspec_params_and_obs(all_obs)
     out = AllObservations()
     old_to_new_idx = Dict{Int64,Vector{Int64}}()
-    old_to_new_obs_idx = Dict{Int64,Dict{Int64,Int64}}()
+    old_to_new_obs_idx = Dict{Tuple{Int64,Int64},Tuple{Int64,Int64}}()
     counter = 1
 
     for (rec_idx, recording) in enumerate(all_obs.recordings)
@@ -262,9 +192,14 @@ function initialize(all_obs::AllObservations)
             old_to_new_obs_idx
         )
     end
-    new_param_dependence!(out, full_param_depend, old_to_new_idx, old_to_new_obs_idx)
-
-    obs_and_law_dependence_table!(out)
+    new_param_and_obs_dependence!(
+        out,
+        full_p_dep,
+        full_o_dep,
+        old_to_new_idx,
+        old_to_new_obs_idx
+    )
+    reverse_param_and_obs_dep!(out)
     out, old_to_new_idx
 end
 
@@ -274,45 +209,52 @@ end
 Fill the `all_obs.depen_param` dictionary with all parameters that are not
 shared between recordings.
 """
+function fill_dependency_for_unspec_params_and_obs(all_obs::AllObservations)
+    new_param_entries = fill_dependency_for_unspec_params(all_obs)
+    new_obs_entries = fill_dependency_for_unspec_obs(all_obs)
+    (
+        merge(all_obs.param_depend, new_param_entries),
+        merge(all_obs.obs_depend, new_obs_entries)
+    )
+end
+
 function fill_dependency_for_unspec_params(all_obs::AllObservations)
     accounted_for_entries = Iterators.flatten(values(all_obs.param_depend))
     new_entries = _PARAM_DEPEND_TYPE()
+
     for (rec_idx, recording) in enumerate(all_obs.recordings)
-        p_names = parameter_names(recording.P)
-        p_obs_names = [parameter_names(obs) for obs in recording.obs]
-        for (p_idx, p_name) in enumerate(p_names)
-            entry = (
-                rec_idx = rec_idx,
-                law_else_obs = true,
-                obs_idx = -1,
-                param_idx = p_idx,
-                param_name = p_name,
-            )
+        # retreive all of the variable parameter names
+        p_names = var_parameter_names(recording.P)
+        for p_name in p_names
+            entry = (rec_idx => p_name)
             if !(entry in accounted_for_entries)
-                new_entries[Symbol("REC$rec_idx","_", p_name)] = [entry]
+                new_entries[Symbol("REC$(rec_idx)_", p_name)] = [entry]
             end
         end
-        for (obs_idx, p_obs_name) in enumerate(p_obs_names)
-            for (p_idx, p_name) in enumerate(p_obs_name)
-                entry = (
-                    rec_idx = rec_idx,
-                    law_else_obs = false,
-                    obs_idx = obs_idx,
-                    param_idx = p_idx,
-                    param_name = p_name,
-                )
+    end
+    new_entries
+end
+
+function fill_dependency_for_unspec_obs(all_obs::AllObservations)
+    accounted_for_entries = Iterators.flatten(values(all_obs.obs_depend))
+    new_entries = _OBS_DEPEND_TYPE()
+
+    for (rec_idx, recording) in enumerate(all_obs.recordings)
+        for (obs_idx, obs) in enumerate(recording.obs)
+            obs_positions = var_parameter_pos(obs)
+            for obs_pos in obs_positions
+                entry = (rec_idx, obs_idx, obs_pos)
                 if !(entry in accounted_for_entries)
                     new_entries[Symbol(
                         "REC$(rec_idx)_OBS$(obs_idx)_",
-                        p_name
+                        obs_pos
                     )] = [entry]
                 end
             end
         end
     end
-    merge(all_obs.param_depend, new_entries)
+    new_entries
 end
-
 
 """
     split_recording!(
@@ -360,12 +302,8 @@ function split_recording!(
                 old_to_new_idx[recording_idx] = [counter]
             end
 
-            if !haskey(old_to_new_obs_idx, recording_idx)
-                old_to_new_obs_idx[recording_idx] = Dict{Int64,Int64}()
-                old_to_new_obs_idx[recording_idx][-1] = -1
-            end
             for j in start_idx:i
-                old_to_new_obs_idx[recording_idx][j] = j-start_idx+1
+                old_to_new_obs_idx[(recording_idx, j)] = (counter, j-start_idx+1)
             end
 
             counter += 1
@@ -378,117 +316,153 @@ function split_recording!(
 end
 
 """
-    new_param_dependence!(out, old_dep, old_to_new_idx)
+    new_param_and_obs_dependence!(
+        out,
+        old_p_dep,
+        old_o_dep,
+        old_to_new_idx,
+        old_to_new_obs_idx
+    )
 
-Define a new parameter dependence structure by using an old parameter dependence
+TODO refresh Define a new parameter dependence structure by using an old parameter dependence
 saved in `old_dep` and deducing the changed indices of affected recording by
 following the `old_to_new_idx` dictionary. The new dependency is saved directly
 to `out` structure.
 """
-function new_param_dependence!(out, old_dep, old_to_new_idx, old_to_new_obs_idx)
+function new_param_and_obs_dependence!(
+        out,
+        old_p_dep,
+        old_o_dep,
+        old_to_new_idx,
+        old_to_new_obs_idx
+    )
+    new_p_dep = new_param_dependence!(old_p_dep, old_to_new_idx)
+    new_o_dep = new_obs_dependence!(old_o_dep, old_to_new_obs_idx)
+    add_dependency!(out, new_p_dep)
+    add_dependency!(out, new_o_dep)
+end
+
+"""
+    new_param_dependence!(old_dep, old_to_new_idx)
+
+Create a new interdependency dictionary for the parameters from the old one
+`old_dep` and the dictionary `old_to_new_idx` that kept track of the changes.
+
+# Examples
+```julia
+old_dep = Dict(
+    :A => [(1, :a), (2, :a1)],
+    :B => [(1, :b), (3, :bbb)],
+)
+old_to_new_idx = Dict(
+    1 => [1, 2], # observation 1 was split into two
+    2 => [3, 4, 5], # observation 2 was split into three
+    3 => [6],
+)
+
+new_dep = new_param_dependence!(old_dep, old_to_new_idx)
+
+new_dep == Dict(
+    :A => [1=>:a, 2=>:a, 3=>:a1, 4=>:a1, 5=>:a1],
+    :B => [1=>:b, 2=>:b, 6=>:bbb],
+)
+```
+"""
+function new_param_dependence!(old_dep, old_to_new_idx)
     new_dep = _PARAM_DEPEND_TYPE()
     for key in keys(old_dep)
         new_entry = _PARAM_DEPEND_ENTRY_TYPE(undef, 0)
         for old_connector in old_dep[key]
+            old_rec_idx, p_symbol = old_connector
             new_connectors = [
-                (
-                    rec_idx = new_rec_idx,
-                    law_else_obs = old_connector.law_else_obs,
-                    obs_idx = old_to_new_obs_idx[old_connector.rec_idx][old_connector.obs_idx],
-                    param_idx = old_connector.param_idx,
-                    param_name = old_connector.param_name,
-                )
-                for new_rec_idx in old_to_new_idx[old_connector.rec_idx]
+                (new_rec_idx => p_symbol)
+                for new_rec_idx in old_to_new_idx[old_rec_idx]
             ]
             append!(new_entry, collect(new_connectors))
         end
         new_dep[key] = new_entry
     end
-    add_dependency!(out, new_dep)
-end
-
-function get_dep(all_obs::AllObservations, coord)
-    p_name = all_obs.idx_to_param[coord]
-    dep = all_obs.param_depend[p_name]
+    new_dep
 end
 
 """
-    obs_and_law_dependence_table!(all_obs::AllObservations)
+    new_obs_dependence!(old_dep, old_to_new_idx)
 
-Create containers that associate to each law an observation a list of parameters
-that they depend on.
+Create a new interdependency dictionary for the observations from the old one
+`old_dep` and the dictionary `old_to_new_idx` that kept track of the changes.
+
+# Example
+```julia
+old_dep = Dict(
+    :A => [(1, 2, 1), (1, 3, 2), (2, 1, 1)],
+    :B => [(2, 2, 2), (3, 2, 1)],
+)
+old_to_new_idx = Dict(
+    (1,1) => (1, 1), # obs (1,1) becomes (1,1)
+    (1,2) => (1, 2),
+    (1,3) => (2, 1), # obs (1,3) becomes (2,1)
+    (2,1) => (3, 1),
+    (2,2) => (4, 1),
+    (2,3) => (5, 1),
+    (3,1) => (6, 1),
+    (3,2) => (6, 2),
+)
+
+new_dep = new_obs_dependence!(old_dep, old_to_new_idx)
+
+new_dep == Dict(
+    :A => [(1, 2, 1), (2, 1, 2), (3, 1, 1)],
+    :B => [(4, 1, 2), (6, 2, 1)]
+)
+```
 """
-function obs_and_law_dependence_table!(all_obs::AllObservations)
-    all_global_coords = sort(collect(keys(all_obs.idx_to_param))) # should be [1,2,...,N] say
+function new_obs_dependence!(old_dep, old_to_new_idx)
+    new_dep = _OBS_DEPEND_TYPE()
+    for key in keys(old_dep)
+        new_entry = _OBS_DEPEND_ENTRY_TYPE(undef, 0)
+        for old_connector in old_dep[key]
+            old_rec_idx, old_obs_idx, obs_idx = old_connector
+            new_rec_idx, new_obs_idx = old_to_new_idx[(old_rec_idx, old_obs_idx)]
+            append!(new_entry, [(new_rec_idx, new_obs_idx, obs_idx)])
+        end
+        new_dep[key] = new_entry
+    end
+    new_dep
+end
 
-    num_rec = length(all_obs.recordings)
-    resize!(all_obs.law_depend, num_rec)
-    resize!(all_obs.obs_depend, num_rec)
+function reverse_param_and_obs_dep!(out)
+    reverse_param_dep!(out)
+    reverse_obs_dep!(out)
+end
 
-    for (i,r) in enumerate(all_obs.recordings)
-        all_obs.law_depend[i] = construct_law_i_dependency(all_obs, all_global_coords, i)
-        num_obs_i = length(r.obs)
-        all_obs.obs_depend[i] = _LAW_DEPEND_TYPE(undef, num_obs_i)
-        for j in 1:num_obs_i
-            all_obs.obs_depend[i][j] = construct_obs_ij_dependency(all_obs, all_global_coords, i, j)
+function reverse_param_dep!(out)
+    recs = out.recordings
+    resize!(out.param_depend_rev, length(recs))
+    for (i, rec) in enumerate(recs)
+        out.param_depend_rev[i] = Tuple{Symbol,Symbol}[]
+    end
+    for key in keys(out.param_depend)
+        vals = out.param_depend[key]
+        for val in vals
+            push!(out.param_depend_rev[val[1]], (key, val[2]))
         end
     end
 end
 
-function construct_law_i_dependency(all_obs::AllObservations, coords, i)
-    law_i_global_coords_idx = filter(
-        c_i->any(
-            x->(x.rec_idx == i && x.law_else_obs),
-            get_dep(all_obs, coords[c_i])
-        ),
-        1:length(coords)
-    )
-
-    law_i_relevant = map(
-        c_i->filter(
-            x->(x.rec_idx == i && x.law_else_obs),
-            get_dep(all_obs, coords[c_i])
-        ),
-        law_i_global_coords_idx
-    )
-    @assert all(length.(law_i_relevant) .== 1)
-    law_i_relevant = first.(law_i_relevant)
-
-    map(
-        x->(
-            global_idx = coords[x[2]],
-            pname = x[1].param_name,
-            local_idx = x[1].param_idx,
-        ),
-        zip(law_i_relevant, law_i_global_coords_idx)
-    )
-end
-
-function construct_obs_ij_dependency(all_obs::AllObservations, coords, i, j)
-    obs_ij_global_coords_idx = filter(
-        c_i->any(
-            x->(x.rec_idx == i && !x.law_else_obs && x.obs_idx == j),
-            get_dep(all_obs, coords[c_i])
-        ),
-        1:length(coords)
-    )
-
-    obs_ij_relevant = map(
-        c_i->filter(
-            x->(x.rec_idx == i && !x.law_else_obs && x.obs_idx == j),
-            get_dep(all_obs, coords[c_i])
-        ),
-        obs_ij_global_coords_idx
-    )
-    @assert all(length.(obs_ij_relevant) .== 1)
-    obs_ij_relevant = first.(obs_ij_relevant)
-
-    map(
-        x->(
-            global_idx = coords[x[2]],
-            pname = x[1].param_name,
-            local_idx = x[1].param_idx,
-        ),
-        zip(obs_ij_relevant, obs_ij_global_coords_idx)
-    )
+function reverse_obs_dep!(out)
+    recs = out.recordings
+    resize!(out.obs_depend_rev, length(recs))
+    for (i, rec) in enumerate(recs)
+        N = length(rec.obs)
+        out.obs_depend_rev[i] = Vector{Vector{Tuple{Symbol,Int64}}}(undef, N)
+        for j in 1:N
+            out.obs_depend_rev[i][j] = Tuple{Symbol,Int64}[]
+        end
+    end
+    for key in keys(out.obs_depend)
+        vals = out.obs_depend[key]
+        for val in vals
+            push!(out.obs_depend_rev[(val[1], val[2])], (key, val[3]))
+        end
+    end
 end

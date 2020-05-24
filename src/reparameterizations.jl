@@ -1,5 +1,5 @@
 function clone end
-
+#=
 """
     set_parameters!(objects, all_obs::AllObservations, coords, θ°)
 
@@ -40,4 +40,12 @@ function set_parameters!(obs::Observation, η)
         obs.θ[i] = η[i]
     end
     obs
+end
+=#
+
+
+function set_parameters!(obs::Observation, η, entries)
+    for (i_η, i_obs) in entries
+        obs.θ[i_obs] = η[i_η]
+    end
 end

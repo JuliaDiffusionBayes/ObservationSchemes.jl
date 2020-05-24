@@ -28,7 +28,7 @@ The law `P` needs to be defined by the user.
     To define diffusion laws you may use [DiffusionDefinition.jl](https://github.com/mmider/DiffusionDefinition.jl). To define conditioned diffusion laws you may use [GuidedProposals.jl](https://github.com/mmider/GuidedProposals.jl).
 
 !!! warning
-    There must exist an implementation of a function `parameter_names(::typeof(P))` if one wants to use functions and structs presented below.
+    There must exist an implementation of a function `var_parameter_names(::typeof(P))` if one wants to use functions and structs presented below.
 
 `obs` is assumed to be a vector of observations, with each element
 being of the type inheriting from `Observation{D,T}`. `x0_prior` is assumed
@@ -46,7 +46,7 @@ We can define multiple recordings as follows:
 ```julia
 const OBS = ObservationSchemes
 struct LawA α; β; end
-OBS.parameter_names(P::LawA) = [:α, :β]
+OBS.var_parameter_names(P::LawA) = [:α, :β]
 
 recordings = [
     (
@@ -92,35 +92,28 @@ ObservationSchemes.add_dependency!
 add_dependency!(
     all_obs,
     Dict(
-    :α_shared => [(rec=1, law_else_obs=true, p_name=:α), (rec=2, law_else_obs=true, p_name=:α)],
-    :β_shared => [(rec=1, law_else_obs=true, p_name=:β), (rec=2, law_else_obs=true, p_name=:β)],
+        :α_shared => [(1, :α), (2, :α)],
+        :β_shared => [(1, :β), (2, :β)],
     )
 )
 ```
 The first (respectively second) entry in the dictionary tells `all_obs` that
 there is a parameter, which from now on will be labeled `:α_shared` (resp.
 `:β_shared`), that is present in the law of recording `1` and the law of
-recording `2` and in both of these cases if one calls `parameter_names(P)` then the
-referred to parameter should have a name `:α` (resp. `:β`). The flag `law_else_obs` indicates that the referred to parameter is placed in the definition of a law, and not in the definition of a parameterized observation. We can also tell the same thing to `AllObservations` object differently:
-```julia
-add_dependency!(
-    all_obs,
-    Dict(
-        :α_shared => [(rec=1, p_idx=1), (rec=2, p_name=:α)],
-        :β_shared => [(rec=1, p_idx=2, p_name=:β), (rec=2, p_idx=2)],
-    )
-)
-```
-where instead of specifying the name via `p_name` we specify the index which
-this parameter takes when a call to `parameter_names(P)` is made. We can also specify
-both and then the error will be thrown if two access paths are not pointing to
-the same parameter.
+recording `2` and in both of these cases if one calls `var_parameter_names(P)` then the
+referred to parameter should have a name `:α` (resp. `:β`).
+
 !!! note
-    The names of the `NamedTuple`s
-    * `(rec=..., p_idx=)`
-    * `(rec=..., p_name=...)` and
-    * `(rec=..., p_idx=..., p_name=...)`
-    above don't matter (in fact they are later downgraded to regular `tuples`), only the order of their entries.
+    If the parameter appears in the observation instead of the law, then the previous tuple of the format `(rec_idx, :param-name)` must be substituted with: `(rec_idx, obs_idx, param_idx_in_obs_vec)`, for instance:
+    ```julia
+    add_dependency!(
+        all_obs,
+        Dict(
+            :γ_shared => [(1, 2, 3), (40, 400, 4)],
+        )
+    )
+    ```
+    indicates that there is a shared parameter `:γ_shared` that enters the second observations in a first recording and that it is the third parameter of this observation and that it also enters 400th observation of the 40th recording and that it enters the 4th parameter of that observation.
 
 Now, we can additionally call
 ```@docs
@@ -143,7 +136,7 @@ It should be clear that the formalism above allows for definition of recordings
 coming from multiple diffusion laws. For instance, we can have
 ```julia
 struct LawB γ; β; end
-OBS.parameter_names(P::LawB) = [:γ, :β]
+OBS.var_parameter_names(P::LawB) = [:γ, :β]
 
 extra_recording = (
     P = LawB(30,40),
@@ -166,12 +159,12 @@ The dictionary specifying interdependence between the laws of stochastic process
 add_dependency!(
     all_obs,
     Dict(
-        :α_shared => [(rec=1, law_else_obs=true, p_name=:α), (rec=2, law_else_obs=true, p_name=:α)],
-        :β_shared => [(rec=1, law_else_obs=true, p_name=:β), (rec=2, law_else_obs=true, p_name=:β), (rec=3, law_else_obs=true, p_name=:β)],
+        :α_shared => [(1, :α), (2, :α)],
+        :β_shared => [(1, :β), (2, :β), (3,:β)],
     )
 )
 ```
-where, notice presence of additional `(rec=3, law_else_obs=true, p_name=:β)`. This time, calling
+where, notice presence of additional `(3,:β)`. This time, calling
 ```julia
 initialised_all_obs, _ = initialize(all_obs)
 ```
@@ -181,7 +174,7 @@ not only splits the recordings at the time of full observations (resulting in
 in the original `all_obs` the third recording came from law `LawB`, which
 depends on a parameter `γ` that was not shared with any other recording and
 hence did not appear in the inter-dependency dictionary. Every such "lonely"
-parameter is introduced by a function `initialise!` and is given a name by
+parameter is introduced by a function `initialize` and is given a name by
 pre-pending its original name with `REC($i)_`, with `($i)` denoting the original
 index of a recording that the parameter came from.
 

@@ -2,7 +2,7 @@ module ObservationSchemes
 
     using LinearAlgebra, StaticArrays
     using GaussianDistributions, Random
-    using Distributions
+    using Distributions, OrderedCollections
 
     import GaussianDistributions: whiten, unwhiten
 
@@ -18,6 +18,7 @@ module ObservationSchemes
     include("observations_linear_gaussian.jl")
     include("observations_general.jl")
     include("all_observations.jl")
+    include("all_observations_utilities.jl")
     include("obs_scheme.jl")
     include("convenience_functions.jl")
     include("reparameterizations.jl")

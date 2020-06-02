@@ -45,9 +45,9 @@ _default_L(obs) = _default_L(obs, ismutable(obs))
 _default_L(obs::T, ::Val{true}) where T = Diagonal(repeat([one(eltype(T))], length(obs)))
 _default_L(obs::T, ::Val{false}) where T = SDiagonal{length(obs)}(I)
 
-_default_Σ(obs) = _default_Σ(obs, ismutable(obs))
-_default_Σ(obs::T, ::Val{true}) where T = Diagonal(repeat([one(eltype(T))], length(obs)))*1e-11
-_default_Σ(obs::T, ::Val{false}) where T = SDiagonal{length(obs)}(I)*1e-11
+_default_Σ(obs, ϵ=1e-11) = _default_Σ(obs, ismutable(obs), ϵ)
+_default_Σ(obs::T, ::Val{true}, ϵ=1e-11) where T = Diagonal(repeat([one(eltype(T))], length(obs)))*ϵ
+_default_Σ(obs::T, ::Val{false}, ϵ=1e-11) where T = SDiagonal{length(obs)}(I)*ϵ
 
 _default_μ(obs) = _default_μ(obs, ismutable(obs))
 _default_μ(obs::T, ::Val{true}) where T = zeros(eltype(T),length(obs))

@@ -1,7 +1,9 @@
-#=
+#===============================================================================
+
     Defines a container for multiple recordings of discrete-time observations
     of diffusion processes. The main object is `AllObservations`
-=#
+
+===============================================================================#
 const _PARAM_DEPEND_ENTRY_TYPE = Vector{Pair{Int64, Symbol}}
 const _OBS_DEPEND_ENTRY_TYPE = Vector{Tuple{Int64,Int64,Int64}}
 
@@ -15,6 +17,34 @@ const _OBS_REV_DEPEND_TYPE = Vector{Vector{Vector{Tuple{Symbol,Int64}}}}
 var_parameter_names(::Any) = nothing
 
 """
+    build_recording(P, obs, t0, x0_prior)
+
+A utility function that creates an appropriate `NamedTuple` that represents a
+single recording.
+"""
+build_recording(P, obs, t0, x0_prior) = (P=P, obs=obs, t0=t0, x0_prior=x0_prior)
+
+"""
+    build_recording(
+        ::Type{K}, tt, observs::Vector, P, t0, x0_prior; kwargs...
+    ) where K
+A utility function for building a recording. Times of recordings are assumed to
+be stored in `tt` and their values in `observs`. `K` is the type of observation
+(for instance `LinearGsnObs`). `kwargs` are name arguments that are passed to
+every single initializer of `K`.
+"""
+function build_recording(
+        ::Type{K}, tt, observs::Vector, P, t0, x0_prior; kwargs...
+    ) where K
+    (
+        P = P,
+        obs = [K(t, obs; kwargs...) for (t,obs) in zip(tt, observs)],
+        t0 = t0,
+        x0_prior = x0_prior,
+    )
+end
+
+@doc raw"""
     struct AllObservations
         recordings::Vector{Any}
         param_depend::Dict{Symbol,Vector{Pair{Int64, Symbol}}}
@@ -23,22 +53,40 @@ var_parameter_names(::Any) = nothing
         obs_depend_rev::Vector{Vector{Vector{Tuple{Symbol,Int64}}}}
     end
 
-A struct gathering multiple observations of a diffusion processes. Additionaly,
+A struct gathering multiple observations of diffusion processes. Additionaly,
 the interdependence structure between parameters shared between various
-diffusions laws used to generate the recorded data is kept. `recordings`
-collects all recordings, `param_depend` is a dictionary with keys—parameter
-labels—and values—vectors with entries that list which laws depend on a
-corresponding parameter. `obs_depend` does the same but for observations.
-`param_depend_rev` gives for each law a list of (variable) parameters it depends
-on and `obs_depend_rev` does the same but for the observations.
+diffusions laws used to generate the recorded data is kept.
+- `recordings`: collects all recordings
+- `param_depend`: is a dictionary with
+    - keys: parameter labels
+    - values: vectors that collect all indices of recordings whose laws depend
+              on a corresponding parameter (in fact collects `Pairs`:
+              `idx-of-a-recording => name-of-parameter`).
+- `obs_depend`: does the same as `param_depend` but for observations.
+                In this case values are vectors that collect `Tuple`s in a
+                format:
+                `(idx-of-a-recording, idx-of-an-observation,
+                idx-of-parameter-in-θ-vector)`.
+- `param_depend_rev`: gives for each recording a list of **variable** parameters
+                      that its law depends on. These are given in a format
+                      `global-param-name => local-param-name`.
+!!! note
+    We use the term variable to refer to those parameters that are returned
+    after a call `var_parameter_names(typeof(P))`.
+
+- `obs_depend_rev`: does the same as `param_depend_rev` but for the
+                    observations. These are given in a format
+                    `global-param-name => local-param-idx`.
+
+----
 
     AllObservations(;P=nothing, obs=nothing, t0=nothing, x0_prior=nothing)
 
 Default constructor creating either an empty `AllObservations` object,
 or initiating it immediately with a single recording where the target comes
 from the law `P`, the observations are stored in `obs` and the observed
-process was started at time `t0` from som position which we put a prior on
-`x0_prior`.
+process was started at time `t0` from som position which we put a prior
+`x0_prior` on.
 
     AllObservations(recording::NamedTuple)
 
@@ -69,7 +117,7 @@ struct AllObservations
             _OBS_REV_DEPEND_TYPE(undef,0)
         )
         @assert all(v->v!=nothing, [P, obs, t0, x0_prior])
-        AllObservations((P=P,obs=obs,t0=t0,x0_prior=x0_prior))
+        AllObservations(build_recording(P, obs, t0, x0_prior))
     end
 
     function AllObservations(recording::NamedTuple)
@@ -99,13 +147,30 @@ function check_recording_format(::T) where T<:NamedTuple
 end
 
 """
+    add_recordings!(
+        all_obs::AllObservations,
+        recordings::AbstractArray{<:NamedTuple}
+    )
+
+Add multiple new recordings `recordings` to an observations container `all_obs`.
+"""
+function add_recordings!(
+        all_obs::AllObservations,
+        recordings::AbstractArray{<:NamedTuple}
+    )
+    for recording in recordings
+        add_recording!(all_obs, recording)
+    end
+end
+
+"""
     add_recording!(all_obs::AllObservations, recording::NamedTuple)
 
-Add a new recording `recording` to observations container `all_obs`.
+Add a new recording `recording` to an observations container `all_obs`.
 """
 function add_recording!(all_obs::AllObservations, recording::NamedTuple)
     check_recording_format(recording)
-    append!(all_obs.recordings, [recording])
+    push!(all_obs.recordings, recording)
 end
 
 """
@@ -166,14 +231,14 @@ function add_a_single_dependency!(
     append!(all_obs.param_depend[key], foo.(val))
 end
 
-"""
+@doc raw"""
     initialize(all_obs::AllObservations)
 
 Split the recordings at the times of full observations to make full use of the
 Markov property (and make the code readily parallelisable). Introduce all
-parameters that were not mentioned in the current dependency dictionary. Create
-dictionaries that allow for efficient retreival of all laws and observations
-that depend on any specified parameter
+*variable* parameters that were not mentioned in the current dependency
+dictionary. Create internal dictionaries `all_obs.param_depend_rev` and
+`all_obs.obs_depend_rev`.
 """
 function initialize(all_obs::AllObservations)
     full_p_dep, full_o_dep = fill_dependency_for_unspec_params_and_obs(all_obs)

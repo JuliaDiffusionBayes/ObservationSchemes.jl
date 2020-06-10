@@ -6,7 +6,18 @@ All priors over starting points inherit from
 ```@docs
 ObservationSchemes.StartingPtPrior
 ```
-They all must implement methods `rand`, `start_pt`, and `logpdf` (and should also implement `inv_start_pt` for MCMC setting). In this package we provide implementations for the following types of starting points
+They all must implement the following methods
+```@docs
+Base.rand(G::ObservationSchemes.StartingPtPrior, [z, ρ=0.0])
+ObservationSchemes.start_pt(z, G::ObservationSchemes.StartingPtPrior, P)
+ObservationSchemes.start_pt(z, G::ObservationSchemes.StartingPtPrior)
+ObservationSchemes.logpdf(G::ObservationSchemes.StartingPtPrior, y)
+```
+and should also implement
+```@docs
+ObservationSchemes.inv_start_pt(y, G::ObservationSchemes.StartingPtPrior, P)
+```
+for MCMC setting. In this package we provide implementations for the following types of starting points
 - Known, fixed starting points
 - Gaussian priors over starting points
 

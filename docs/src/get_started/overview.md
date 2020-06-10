@@ -8,7 +8,7 @@ The package is not registered yet. To install it write:
 ---------------------
 To define a single observation collected according to
 ```math
-V_t = LX_t+\xi,\quad \xi\sim N(\mu,\Sigma),
+V_t = LX_t+ξ,\quad ξ ∼ N(μ,Σ),
 ```
 call
 ```julia
@@ -21,9 +21,9 @@ obs = LinearGsnObs(t, ν; L = L, Σ = Σ) # μ is defaulted to 0
 ```
 For a general observation scheme:
 ```math
-V_t = g(X_t) + \xi,\quad \xi\sim \Xi
+V_t = g(X_t) + ξ,\quad ξ ∼ Ξ
 ```
-you may use `GeneralObs` instead of `LinearGsnObs`, but you must provide the function $$g$$, the law $$\Xi$$ (and an approximation via `LinearGsnObs` if you wish to use it with other packages in [DiffusionBayes](https://github.com/JuliaDiffusionBayes/DiffusionBayes.jl)).
+you may use `GeneralObs` instead of `LinearGsnObs`, but you must provide the function $$g$$, the law $$\Xi$$ (and an approximation via `LinearGsnObs` if you wish to use it with other packages in [JuliaDiffusionBayes](https://github.com/JuliaDiffusionBayes)).
 
 # Multiple observations
 -----------------------

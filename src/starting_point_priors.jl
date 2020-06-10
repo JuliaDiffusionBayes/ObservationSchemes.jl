@@ -1,11 +1,59 @@
 """
-    StartingPtPrior
+    StartingPtPrior{T}
 
 Types inheriting from the abstract type `StartingPtPrior` indicate the prior
 that is put on the starting point of the observed path of some stochastic
-process
+process. `T` denotes the DataType of the starting point.
 """
 abstract type StartingPtPrior{T} end
+
+@doc raw"""
+    Base.rand(G::StartingPtPrior, [z, ρ=0.0])
+
+Sample a new starting point according to its prior distribution. An
+implementation with arguments `z`, `ρ` implements a preconditioned
+Crank-Nicolson scheme with memory parameter `ρ` and a current **non-centered
+variable** `z`. `z` is also referred to as the **driving noise**.
+"""
+Base.rand(G::StartingPtPrior, z, ρ=0.0) = error("Not Implemented")
+Base.rand(G::StartingPtPrior) = error("Not Implemented")
+
+
+"""
+    start_pt(z, G::StartingPtPrior, P)
+
+Compute a new starting point from the white noise for a given posterior
+distribution obtained from combining prior `G` and the likelihood encoded by the
+object `P`.
+"""
+start_pt(z, G::StartingPtPrior, P) = error("Not Implemented")
+
+"""
+    start_pt(z, G::StartingPtPrior)
+
+Compute a new starting point from the white noise for a given prior
+distribution `G`
+"""
+start_pt(z, G::StartingPtPrior) = error("Not Implemented")
+
+
+"""
+    inv_start_pt(y, G::StartingPtPrior, P)
+
+Compute the driving noise that is needed to obtain starting point `y` under
+prior `G` and the likelihood in `P`
+"""
+inv_start_pt(y, G::StartingPtPrior, P) = error("Not Implemented")
+
+
+"""
+    logpdf(G::StartingPtPrior, y)
+
+log-probability density function evaluated at `y` of a prior distribution `G`
+"""
+Distributions.logpdf(G::StartingPtPrior, y) = error("Not Implemented")
+
+
 
 #===============================================================================
                             Struct definitions
@@ -17,6 +65,10 @@ abstract type StartingPtPrior{T} end
     end
 
 Indicates that the starting point is known and stores its value in `y`
+
+    KnownStartingPt(y::T) where T
+
+Base constructor.
 """
 struct KnownStartingPt{T} <: StartingPtPrior{T}
     y::T
@@ -37,6 +89,11 @@ mean `μ` and covariance matrix `Σ` (and pre-computed precision `Λ`:=`Σ`⁻¹
 Sampling is always done via non-centred parametrization, by sampling white noise
 `z` according to Gaussian with zero mean and identity covariance: `μ₀` and `Σ₀`,
 and then transforming `z` to a variable with mean and covariance `μ` and `Σ`.
+
+    GsnStartingPt(μ::T, Σ::S)
+
+Base constructor. It initialises the mean `μ` and covariance `Σ` parameters and
+`Λ` is set according to `Λ`:=`Σ`⁻¹.
 """
 struct GsnStartingPt{T,S,TM} <: StartingPtPrior{T} where {S}
     μ::T
@@ -54,12 +111,6 @@ struct GsnStartingPt{T,S,TM} <: StartingPtPrior{T} where {S}
     ) where {T,S,TM} = new{T,S,TM}(μ, Σ, Λ, μ₀, Σ₀)
 end
 
-"""
-    GsnStartingPt(μ::T, Σ::S)
-
-Base constructor of GsnStartingPt. It initialises the mean `μ` and covariance
-`Σ` parameters and `Λ` is set according to `Λ`:=`Σ`⁻¹
-"""
 GsnStartingPt(μ, Σ) = GsnStartingPt(μ, Σ, ismutable(μ))
 
 function GsnStartingPt(μ::T, Σ, ::Val{true}) where T
@@ -151,6 +202,7 @@ Return starting point
 """
 start_pt(z, G::KnownStartingPt, P) = G.y
 
+#TODO check if this is needed
 """
     start_pt(G::KnownStartingPt, P)
 
@@ -204,7 +256,7 @@ end
 
 
 """
-    logpdf(::GsnStartingPt, y)
+    logpdf(G::GsnStartingPt, y)
 
 log-probability density function evaluated at `y` of a prior distribution `G`
 """

@@ -1,4 +1,4 @@
-"""
+@doc raw"""
     struct GeneralObs{Tag,D,T,FPT,K,Tlo,Tg,Td} <: Observation{D,T}
         lin_obs::Tlo
         g::Tg
@@ -8,11 +8,28 @@
         θ::Vector{K}
     end
 
-General observation of the underlying process that is of the form: g(x)+ξ,
-where ξ is distributed according to `dist`, `g` is a function specified
-externally, `obs` is the observation made at time `t`, `θ` is a container that
-may contain parameters and `lin_obs` is the approximation to this general
-observation scheme via the linearization with Gaussian noise.
+General observation of the underlying process that is of the form:
+```math
+g(x)+ξ,
+```
+where $ξ$ is distributed according to `dist`, $g$ (corresponding to passed `g`)
+is a function specified externally, `obs` is the observation made at time `t`,
+`θ` is a container that may contain parameters and `lin_obs` is the
+approximation to this general observation scheme via the linearization with
+Gaussian noise.
+
+    GeneralObs(
+        t,
+        obs,
+        linearization;
+        dist=_default_dist(obs),
+        g=identity,
+        fpt=NoFirstPassageTimes(),
+        Tag=0,
+        θ=[],
+    )
+
+Base constructor.
 """
 struct GeneralObs{Tag,D,T,FPT,K,Tlo,Tg,Td} <: Observation{D,T}
     lin_obs::Tlo
@@ -85,3 +102,10 @@ function Base.summary(io::IO, obs::GeneralObs)
     println(io, "|and hit ENTER.")
     println(io, repeat("⋆ ", 10))
 end
+
+
+function Base.rand(rng::Random.AbstractRNG, o::GeneralObs, x)
+    error("Not Implemented")
+end
+
+Base.rand(o::GeneralObs, x) = rand(Random.GLOBAL_RNG, o, x)

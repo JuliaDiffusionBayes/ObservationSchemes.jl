@@ -7,7 +7,15 @@
 
 ===============================================================================#
 """
-    package
+    package(objs::AbstractArray, all_obs::AllObservations)
+
+    package(objs::AbstractArray, recording::NamedTuple)
+
+    package(obj, recording::NamedTuple)
+
+    package(objs::AbstractArray, old_to_new_idx::Dict, all_obs::AllObservations)
+
+    package(obj, all_obs::AllObservations)
 
 Various packaging functions that zip together objects/functions/structs together
 with observations defined in AllObservations/recording
@@ -62,24 +70,6 @@ function package(obj, all_obs::AllObservations)
 end
 
 """
-    build_recording(
-            ::Type{K}, tt, observs::Vector, P, t0, x0_prior; kwargs...
-        ) where K
-Utility function to build a recording that follows the convention adopted in
-package ObservationSchemes.
-"""
-function build_recording(
-        ::Type{K}, tt, observs::Vector, P, t0, x0_prior; kwargs...
-    ) where K
-    (
-        P = P,
-        obs = [K(t, obs; kwargs...) for (t,obs) in zip(tt, observs)],
-        t0 = t0,
-        x0_prior = x0_prior,
-    )
-end
-
-"""
     setup_time_grids(
         all_obs::AllObservations,
         dt=0.01,
@@ -129,11 +119,8 @@ _idx_if_array(x, i) = typeof(x) <: AbstractArray ? x[i] : x
         already_arranged_tt=nothing
     )
 
-Set up a time grid for a single recording. Starts with an equidistant time grid
-with mesh witdh `dt` and applies a transformation `τ` to each inter-observation
-integral. Alternatively, if `already_arranged_tt` is passed then the initial
-setting up of equidistant grid is omitted and `already_arrange_tt` is used in
-its place for the `τ` transformation.
+Same as a version for a single interval, but applies recursively to all
+inter-observation intervals in `recording`.
 """
 function setup_time_grids(
         recording::NamedTuple,
@@ -196,14 +183,14 @@ end
 """
     num_recordings(all_obs::AllObservations)
 
-Return total number of recordings
+Return the total number of recordings in `all_obs`.
 """
 num_recordings(all_obs::AllObservations) = length(all_obs.recordings)
 
 """
     num_obs(all_obs::AllObservations)
 
-Return total number of observations
+Return the total number of observations in all recordings of `all_obs`.
 """
 function num_obs(all_obs::AllObservations)
     mapreduce(r->length(r.obs), +, all_obs.recordings)

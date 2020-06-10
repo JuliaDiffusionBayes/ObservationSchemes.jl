@@ -4,13 +4,13 @@ All observation schemes inherit from
 ```@docs
 ObservationSchemes.Observation
 ```
-and must have methods
+which has methods
 ```@docs
 ObservationSchemes.eltype
 ObservationSchemes.size
 ObservationSchemes.length
 ```
-implemented for them. The idea is to decorate each recorded data-point with such structs, and in doing so, encode the way in which it was collected.
+automatically implemented for it. The idea is to decorate each recorded data-point with such structs, and in doing so, encode the way in which it was collected.
 
 We implemented two concrete structs that may be used for defining a single observation:
 - `LinearGsnObs`: to encode observations of the linear transformations of the underlying process disturbed by Gaussian noise
@@ -56,7 +56,7 @@ obs = LinearGsnObs(t, v; full_obs=true)
 Specifying `full_obs=true` is important, as it lets the compiler differentiate
 between an actual, full observation with some artificial noise and a (possibly)
 partial observation with very low level (or also artificial level) of noise.
-**As a result, Julia knows when the Markov property can be applied!**
+**As a result, other packages from [JuliaDiffusionBayes](https://github.com/JuliaDiffusionBayes) know when the Markov property can be applied.**
 
 We can view a summary of the observation by calling `summary`:
 ```julia
@@ -82,7 +82,7 @@ julia> summary(obs)
 |No first passage times recorded.
 ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆
 ```
-Notice that various defaults and type-inferences have kicked in. It was recognized that the observation does not depend on any parameters, that first-passage time setting does not apply and that the observation was a mutable type and hence regular `Arrays` are used to define `L`, `μ` and `Σ`.
+Notice that various defaults and type-inferences have kicked in. It was recognized that the observation does not depend on any parameters, that first-passage time setting does not apply and that the observation was not of a static type and hence regular `Arrays` are used to define `L`, `μ` and `Σ`.
 
 
 ### [Linear transformations of the process disturbed by Gaussian noise](@id standard_example_lingsnobs)
@@ -98,9 +98,9 @@ obs = LinearGsnObs(t, v; L = L, Σ = Σ)
 ```
 for defining a three-dimensional observation `v` made at time $2.0$ of a
 four-dimensional process $X$, where the first coordinate of the observation is
-$X_t^{[1]}+2X_t^{[3]}+\xi^{[1]}$, with $\xi^{[1]}\sim N(0,1)$,
+$X_t^{[1]}+2X_t^{[3]}+ξ^{[1]}$, with $ξ^{[1]} ∼ N(0,1)$,
 the second coordinate is
-$3X_t^{[1]}+4X_t^{[2]}+\xi^{[2]}$, with $\xi^{[2]}\sim N(0,1)$,
+$3X_t^{[1]}+4X_t^{[2]}+ξ^{[2]}$, with $ξ^{[2]} ∼ N(0,1)$,
 and the third coordinate is
 $X_t^{[2]}+X_t^{[4]}$, with no real noise (only artificial one, needed for
 numerical reasons). We can display the summary of the observation with:
@@ -130,9 +130,15 @@ julia> summary(obs)
 Note that the internal containers are now set to be `SVector`s (even `μ`, which wasn't passed to a constructor but its type was inferred and its value set to zero). Additionally, Julia understands that this is not a full observation and hence Markov property cannot be applied.
 
 ### [First-passage time observations](@id first_passage_time)
-Support for certain first-passage time settings is provided. By default `LinearGsnObs` sets the first-passage time info to `NoFirstPassageTimes`. However, this can be changed. For instance, to
-indicate in the example above that the last coordinate of `v` actually reaches
-level $3.0$ for the very first time at time $1.0$ we can specify the following:
+Support for certain first-passage time settings is provided. By default `LinearGsnObs` sets the information about the first-passage times to
+```@docs
+ObservationSchemes.NoFirstPassageTimes
+```
+However, this can be changed by passing appropriately initialized
+```@docs
+ObservationSchemes.FirstPassageTimeInfo
+```
+For instance, to indicate in the example above that the last coordinate of `v` actually reaches level $3.0$ for the very first time at time $1.0$ we can specify the following:
 ```julia
 t, v = 1.0, [1.0, 2.0, 3.0]
 fpt = FirstPassageTimeInfo(
@@ -183,7 +189,7 @@ changes appropriately to display the new summary of the first-passage time infor
     This package is agnostic with respect to the algorithms that are later used on the decorated observations. Consequently it doesn't make any checks for whether the observations make sense. For instance in the package [GuidedProposals.jl](https://github.com/JuliaDiffusionBayes/GuidedProposals.jl) that deals with simulating conditioned diffusions, a support for first-passage time observations is currently extended only to diffusions  where the dynamics of the coordinate whose first-passage time is observed **is devoid of any Wiener noise**. The onus of checking whether this or other constraints are satisfied are on the user.
 
 !!! tip "Why do we refer to `LinearGsnObs` as most important?"
-    In practice, all other observation schemes are handled by approximating them with a suitable `LinearGsnObs` and then correcting the resulting approximation error with Metropolis-Hastings steps. Consequently, `LinearGsnObs` will be a building block of any other observation scheme.
+    In practice, all other observation schemes are handled by other packages in [JuliaDiffusionBayes](https://github.com/JuliaDiffusionBayes) by approximating them with a suitable `LinearGsnObs` and then correcting the resulting approximation error with the Metropolis-Hastings algorithm. Consequently, `LinearGsnObs` will be a building block of any other observation scheme.
 
 ## Parameterizing `LinearGsnObs`
 ---------------------------------
@@ -276,18 +282,18 @@ In principle, any observation types are supported, but this comes at a cost of h
 ObservationSchemes.GeneralObs
 ```
 
-For this struct, the required parameters are the time of observation and the observation itself as well as the approximation via `LinearGsnObs`. For instance, to specify the following observational scheme:
+For this struct the required parameters are the time at which the observation was recorded and the observation itself, as well as the approximation via `LinearGsnObs`. For instance, to specify the following observational scheme:
 ```math
 V_t = g(X_t)+ξ
 ```
-where ξ is distributed according to a bivariate $$T$$-distribution with $$4$$ degrees of freedom, some specified mean $$\mu$$ and covariance $$\Sigma$$, $$g$$ is a non-linear function:
+where $ξ$ is distributed according to a bivariate $T$-distribution with $4$ degrees of freedom, some specified mean $μ$ and covariance $Σ$, $g$ is given by the following non-linear function:
 ```math
 g(x):=
 \left(
-\begin{matrix}
-(x^{[1]})^2\\
-(x^{[2]})^2
-\end{matrix}
+    \begin{matrix}
+        (x^{[1]})^2\\
+        (x^{[2]})^2
+    \end{matrix}
 \right)
 ```
 we may write:

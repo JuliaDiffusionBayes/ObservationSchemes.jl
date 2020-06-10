@@ -21,7 +21,6 @@ module ObservationSchemes
     include("all_observations_utilities.jl")
     include("obs_scheme.jl")
     include("convenience_functions.jl")
-    include("reparameterizations.jl")
 
     # starting_point_priors.jl
     export KnownStartingPt, GsnStartingPt
@@ -36,12 +35,15 @@ module ObservationSchemes
     export GeneralObs
 
     # all_observations.jl
-    export AllObservations, add_recording!, add_dependency!, initialize
+    export AllObservations, add_recording!, add_recordings!, add_dependency!
+    export initialize
 
     # obs_scheme.jl
     export ObsScheme, load_data
 
     # convenience_functions.jl
     export package, build_recording, num_recordings, num_obs
+
+    export print_parameters
 
 end # module

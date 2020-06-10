@@ -1,10 +1,11 @@
 #===============================================================================
 
         Linear transformation of the underlying process, disturbed
-        by Gaussian noise
+        by Gaussian noise. The main struct introduced here is
+        `LinearGsnObs`.
 
 ===============================================================================#
-"""
+@doc raw"""
     struct LinearGsnObs{Tag,D,T,FPT,S,R,K} <: Observation{D,T}
         L::S
         μ::T
@@ -16,13 +17,31 @@
     end
 
 Observation of the underlying process that is of the form:
-LX+ξ, where ξ∼N(μ,Σ) and L,Σ and μ are respectively matrices and a vector of
-appropriate dimensions. `FPT` stores information about first-passage times.
-`full_obs` is an indicator for whether it is a full observation of the process
-(as it grants the use of Markov Property). `θ` is a container that may contain
-parameters that enter `L`, `μ`, `Σ` and `Tag` is a disambiguation flag used at
-compile time or for multiple dispatch to differentiate between different
-observation types.
+```math
+LX+ξ,\quad\mbox{where }ξ∼N(μ,Σ),
+```
+and $L\in\mathbb{R}^{D×d}$, $Σ\in\mathbb{R}^{D×D}$ and $μ\in\mathbb{R}^D$, with
+$d>0$ the dimension of the underlying process $X$. `FPT` stores information
+about first-passage times. `full_obs` is an indicator for whether it is a full
+observation of the process (as it grants the use of Markov Property). `θ` is a
+container that may contain parameters that enter `L`, `μ` and `Σ`, whereas `Tag`
+is a disambiguation flag used at compile time or for multiple dispatch to
+differentiate between different observation types.
+
+    function LinearGsnObs(
+        t,
+        obs::T;
+        L=_default_L(obs), # defaults to I
+        Σ=_default_Σ(obs), # defaults to ϵI, with ϵ=1e-11
+        μ=_default_μ(obs), # defaults to 0 vector
+        fpt=NoFirstPassageTimes(),
+        full_obs=false,
+        Tag=0,
+        θ=[],
+    ) where T
+
+Base constructor of LinearGsnObs. `t` is the time of the observation and `obs`
+is the actual observation. The remaining, named parameters are self-explanatory.
 """
 struct LinearGsnObs{Tag,D,T,FPT,TL,Tμ,TΣ,K} <: Observation{D,T}
     L::TL
@@ -34,7 +53,8 @@ struct LinearGsnObs{Tag,D,T,FPT,TL,Tμ,TΣ,K} <: Observation{D,T}
     θ::Vector{K}
 
     function LinearGsnObs(
-            t, obs::T, L::TL, Σ::TΣ, μ::Tμ, fpt::FPT, full_obs, θ::Vector{K}, Tag,
+            t, obs::T, L::TL, Σ::TΣ, μ::Tμ, fpt::FPT, full_obs, θ::Vector{K},
+            Tag,
         ) where {T,TL,TΣ,Tμ,FPT,K}
         D = length(obs)
         new{Tag,D,T,FPT,TL,Tμ,TΣ,K}(L, μ, Σ, obs, t, full_obs, θ)
@@ -42,12 +62,16 @@ struct LinearGsnObs{Tag,D,T,FPT,TL,Tμ,TΣ,K} <: Observation{D,T}
 end
 
 _default_L(obs) = _default_L(obs, ismutable(obs))
-_default_L(obs::T, ::Val{true}) where T = Diagonal(repeat([one(eltype(T))], length(obs)))
+_default_L(obs::T, ::Val{true}) where T = Diagonal(
+    repeat([one(eltype(T))], length(obs))
+)
 _default_L(obs::T, ::Val{false}) where T = SDiagonal{length(obs)}(I)
 
 _default_Σ(obs, ϵ=1e-11) = _default_Σ(obs, ismutable(obs), ϵ)
-_default_Σ(obs::T, ::Val{true}, ϵ=1e-11) where T = Diagonal(repeat([one(eltype(T))], length(obs)))*ϵ
-_default_Σ(obs::T, ::Val{false}, ϵ=1e-11) where T = SDiagonal{length(obs)}(I)*ϵ
+_default_Σ(obs::T, ::Val{true}, ϵ=1e-11) where T = ϵ*Diagonal(
+    repeat([one(eltype(T))], length(obs))
+)
+_default_Σ(obs::T, ::Val{false}, ϵ=1e-11) where T = ϵ*SDiagonal{length(obs)}(I)
 
 _default_μ(obs) = _default_μ(obs, ismutable(obs))
 _default_μ(obs::T, ::Val{true}) where T = zeros(eltype(T),length(obs))
@@ -170,3 +194,21 @@ end
 
 var_parameter_pos(o::Observation) = tuple()
 parameters(o::Observation) = tuple(o.θ...)
+
+
+
+@doc raw"""
+    Base.rand([rng::Random.AbstractRNG], o::LinearGsnObs, X)
+
+Sample an observation according to
+```math
+V ∼ L X + ξ,\quad \mbox{where } ξ∼N(μ,Σ),
+```
+with $L$, $μ$ and $Σ$ defined in `o`.
+"""
+function Base.rand(rng::Random.AbstractRNG, o::LinearGsnObs, x)
+    o.full_obs && return x
+    L(o) * x + rand(Gaussian(μ(o), Σ(o)))
+end
+
+Base.rand(o::LinearGsnObs, x) = rand(Random.GLOBAL_RNG, o, x)

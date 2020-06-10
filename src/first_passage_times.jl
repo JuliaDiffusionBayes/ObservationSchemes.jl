@@ -14,7 +14,7 @@ Compile-time indicator that the observation stores no first-passage time data
 struct NoFirstPassageTimes <: FirstPassageAbstract end
 
 """
-    FirstPassageTimeInfo{C,L,U,A} <: FirstPassageAbstract
+    FirstPassageTimeInfo{C,L,U,A,R} <: FirstPassageAbstract
 
 Compile-time indicator for the first-passage time information conveyed by the
 data-point. `C` lists the affected coordinates (of the observations, not the
@@ -26,15 +26,27 @@ stored in `R` that happens anytime before the actual first-passage time,
 the reset-time happens in the direction opposite to the direction of
 first-passage time crossing; additionally, the coordinate can reach the
 first-passage time level prior to being reset).
-"""
-struct FirstPassageTimeInfo{C,L,U,A,R} <: FirstPassageAbstract
 
-    function FirstPassageTimeInfo(
+    FirstPassageTimeInfo(
         coords,
         levels,
         upcrossings,
         additional_reset_required,
         reset_levels=tuple()
+    )
+
+Base constructor.
+"""
+struct FirstPassageTimeInfo{C,L,U,A,R} <: FirstPassageAbstract
+
+    FirstPassageTimeInfo{C,L,U,A,R}() where {C,L,U,A,R} = new{C,L,U,A,R}()
+
+    function FirstPassageTimeInfo(
+            coords,
+            levels,
+            upcrossings,
+            additional_reset_required,
+            reset_levels=tuple()
         )
         N = length(coords)
         @assert length(levels) == length(upcrossings) == N

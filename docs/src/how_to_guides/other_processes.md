@@ -1,0 +1,5 @@
+# How to deal with stochastic processes other than diffusions?
+***
+In [JuliaDiffusionBayes](https://github.com/JuliaDiffusionBayes) we work mostly with diffusion processes and we have also explicitly used an example with diffusion processes [here](@ref example_for_obs_scheme) in this documentation. However, the source code of [ObservationSchemes.jl](https://github.com/JuliaDiffusionBayes/ObservationSchemes.jl) does not make any assumptions at any point about the type of underlying law that generated the data. Consequently, it makes no difference whatsoever to [ObservationSchemes.jl](https://github.com/JuliaDiffusionBayes/ObservationSchemes.jl) whether your observations come from a diffusion process or from some other stochastic process. The onus is on the user to specify an appropriate law for the stochastic process when defining a `recording`.
+
+In fact, you don't even need to be dealing with stochastic processes. You might as well have iid distributions of some random variable. In that case, simply make sure that your law is well-defined and then pass your observations with some dummy time-variable (doing the same for the starting point).

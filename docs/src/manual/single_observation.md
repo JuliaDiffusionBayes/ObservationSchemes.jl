@@ -275,7 +275,7 @@ ObservationSchemes.ν
 ObservationSchemes.obs
 ```
 
-## Non-linear, non-Gaussian observations
+## [Non-linear, non-Gaussian observations](@id non_linear_non_gsn)
 ----------------------------------------
 In principle, any observation types are supported, but this comes at a cost of having to provide some information explicitly. The main struct for specifing general observation schemes is
 ```@docs

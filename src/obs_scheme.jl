@@ -54,30 +54,54 @@ end
 Decorate the data in `xx` and times of recordings in `tt` according to an
 observation scheme template stored in `os`.
 """
-load_data(os::ObsScheme, tt, xx) = load_data(os.mode, os, collect(zip(tt, xx)))
+load_data(os::ObsScheme, tt, xx) = load_data(os, collect(zip(tt, xx)))
 
 """
     load_data(os::ObsScheme, tt_xx)
 
 Same as `load_data(os::ObsScheme, tt, xx)`, but `tt_xx` is a vector of tuples
 that pair the observations with their recorded times.
-"""
-load_data(os::ObsScheme, tt_xx) = load_data(os.mode, os, tt_xx)
 
-function load_data(::Val{:simple}, os::ObsScheme, tt_xx::Vector)
+    load_data(os::ObsScheme, tt_xx_filename::String)
+
+Same as above, but `tt_xx` are stored in a .csv file named `tt_xx_filename`,
+with each row containing time `t` and its respective observation `x` stored
+back-to-back.
+"""
+load_data(os::ObsScheme, tt_xx) = load_data(
+    _pattern_iter(os.mode, os),
+    os, tt_xx
+)
+
+function _pattern_iter(::Val{:simple}, os::ObsScheme)
     N = length(os.pattern)
+    λ(i) = os.pattern[mod1(i, N)]
+    λ
+end
+
+function _pattern_iter(::Any, os::ObsScheme)
+    λ(i) = os.full_pattern[i]
+    λ
+end
+
+function load_data(λ::Function, os::ObsScheme, tt_xx::Vector)
     observs = [
-        obs_from_template(tt_xx[i], os.obs[os.pattern[mod1(i, N)]])
+        obs_from_template(tt_xx[i], os.obs[λ(i)])
         for i in eachindex(tt_xx)
     ]
 end
 
-function load_data(::Any, os::ObsScheme, tt_xx::Vector)
-    @assert length(full_pattern) == length(tt_xx)
-    observs = [
-        obs_from_template(tt_xx[i], os.obs[os.full_pattern[i]])
-        for i in eachindex(tt_xx)
-    ]
+function load_data(λ::Function, os::ObsScheme, tt_xx_filename::String)
+    i = 0
+    observs = map(eachline(tt_xx_filename)) do line
+        i += 1
+        tt_xx = parse.(Float64, split(line, ","))
+        obs_from_template(
+            (tt_xx[1], tt_xx[2:end]),
+            os.obs[λ(i)]
+        )
+    end
+    observs
 end
 
 function obs_from_template(obs, tmp::LinearGsnObs)

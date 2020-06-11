@@ -42,7 +42,7 @@ collect(os::ObservationSchemes.ObsScheme, path, step=1, record_start_pt=false)
 ```
 We only need to simulate the trajectory and define the observation scheme. Then, we can use `collect` to generate an appropriately decorated dataset from such raw recording.
 
-### Example
+### [Example](@id example_for_obs_scheme)
 For instance we can use the package [DiffusionDefinition.jl](https://github.com/JuliaDiffusionBayes/DiffusionDefinition.jl) to simulate a trajectory from the FitzHugh–Nagumo model:
 ```julia
 using DiffusionDefinition, StaticArrays
@@ -65,7 +65,7 @@ obs_sch = ObsScheme(
 ```
 and then very simply generate a dataset
 ```julia
-data = collect(obs_sch, X, 1000, true)
+data = collect(obs_sch, X, 1000, false)
 ```
 Examining the first two and the last observation yield:
 ```julia

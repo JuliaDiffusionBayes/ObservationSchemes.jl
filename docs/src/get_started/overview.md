@@ -172,4 +172,4 @@ Once you're done setting up an instance of `AllObservations` call `initialize` t
 ```julia
 initialised_all_obs, old_to_new_idx = initialize(all_obs)
 ```
-The object `initialised_all_obs` will now contain all necessary information about how the data were collected, everything that is known about the underlying process that generated it, as well as the data itself.
+The object `initialised_all_obs` will now contain all necessary information about how the data were collected, everything that is known about the underlying process that generated it, as well as the data themselves.

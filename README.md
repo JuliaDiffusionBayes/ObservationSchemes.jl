@@ -1,6 +1,6 @@
 <h1 align="center">
   <br>
-  <a href="https://juliadiffusionbayes.github.io/ObservationSchemes.jl/dev/"><img src="https://github.com/JuliaDiffusionBayes/ObservationSchemes.jl/tree/master/docs/src/assets/logo.png" alt="ObservationSchemes.jl" width="200"></a>
+  <a href="https://juliadiffusionbayes.github.io/ObservationSchemes.jl/dev/"><img src="https://raw.githubusercontent.com/JuliaDiffusionBayes/ObservationSchemes.jl/master/docs/src/assets/logo.png" alt="ObservationSchemes.jl" width="200"></a>
   <br>
   ObservationSchemes.jl
   <br>

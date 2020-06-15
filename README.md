@@ -46,9 +46,8 @@
 
 ## Installation
 
-The package is not yet registered. To install it, type in:
 ```julia
-] add https://github.com/JuliaDiffusionBayes/ObservationSchemes.jl
+] add ObservationSchemes
 ```
 
 ## How To Use

@@ -3,9 +3,8 @@
 
 ## Installation
 ---------------------------------
-The package is not registered yet. To install it write:
 ```julia
-] add https://github.com/JuliaDiffusionBayes/ObservationSchemes.jl
+] add ObservationSchemes
 ```
 
 ## A single observation

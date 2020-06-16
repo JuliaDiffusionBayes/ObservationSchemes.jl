@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Observation schemes · ObservationSchemes.jl</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="ObservationSchemes.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit">ObservationSchemes.jl</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../get_started/overview/">Get started</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">User manual</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../single_observation/">A single observation</a></li><li><a class="tocitem" href="../start_pt_prior/">Priors over starting points</a></li><li><a class="tocitem" href="../multiple_observations/">Multiple observations</a></li><li class="is-active"><a class="tocitem" href>Observation schemes</a><ul class="internal"><li><a class="tocitem" href="#Generating-data-directly-from-the-simulated-trajectory-1"><span>Generating data directly from the simulated trajectory</span></a></li></ul></li><li><a class="tocitem" href="../utility_functions/">Utility fuctions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">How to...</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../how_to_guides/simple_os/">... ergonomically deal with simple observation schemes?</a></li><li><a class="tocitem" href="../../how_to_guides/custom_priors/">... define custom priors over starting points?</a></li><li><a class="tocitem" href="../../how_to_guides/custom_os/">... define custom observation schemes?</a></li><li><a class="tocitem" href="../../how_to_guides/dataframes/">... work with dataframes?</a></li><li><a class="tocitem" href="../../how_to_guides/csv_files/">... read data directly from a <code>.csv</code> file?</a></li><li><a class="tocitem" href="../../how_to_guides/save_to_files/">... save decorated data to a file?</a></li><li><a class="tocitem" href="../../how_to_guides/other_processes/">... deal with stochastic processes other than diffusions?</a></li><li><a class="tocitem" href="../../how_to_guides/update_params/">... leverage <code>AllObservations</code> to efficiently update parameters?</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../tutorials/single_path/">Defining an observation scheme for a single trajectory of a FitzHugh–Nagumo model</a></li></ul></li><li><a class="tocitem" href="../../module_index/">Index</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">User manual</a></li><li class="is-active"><a href>Observation schemes</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Observation schemes</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/JuliaDiffusionBayes/ObservationSchemes.jl/blob/master/docs/src/manual/observation_schemes.md#L" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="obs_scheme-1"><a class="docs-heading-anchor" href="#obs_scheme-1">Defining observation schemes and loading data</a><a class="docs-heading-anchor-permalink" href="#obs_scheme-1" title="Permalink"></a></h1><hr/><p>Decorating each and single one of the observations as in the previous section might become quite tiresome. However, most often we collect multiple data points according to a single (or only a few different) observation scheme(s), in which case explicitly decorating each observation separately does not really seem to be necessary. To this end we provide a struct <code>ObsScheme</code> together with a function <code>load_data</code> for a convenient way of decorating multiple observations at once.</p><article class="docstring"><header><a class="docstring-binding" id="ObservationSchemes.ObsScheme" href="#ObservationSchemes.ObsScheme"><code>ObservationSchemes.ObsScheme</code></a> — <span class="docstring-category">Type</span></header><section><div><pre><code class="language-julia">struct ObsScheme{T}
+    obs::T
+    pattern::Vector{Int64}
+    full_pattern::Vector{Int64}
+    mode::Val
+end</code></pre><p>A struct <code>ObsScheme</code> acts as a template for reading in multiple observations.</p><ul><li><code>obs</code>: contains a list of all possible observation schemes according to which        the data (that are supposed to be loaded in) were recorded</li><li><code>pattern</code>: specifies the order in which the list of <code>obs</code> is supposed to be            iterated through when reading in successive observations. Usually            the number of datapoint is larger than the length of <code>pattern</code> in            which case the <code>pattern</code> is cycled through repeatedly.</li><li><code>full_pattern</code>: as pattern, but must be of the same length as the loaded in                 data.</li><li><code>mode</code>: if set to Val{:simple}(), then cycles through <code>pattern</code>. Otherwise         cycles through <code>full_pattern</code>.</li></ul><pre><code class="language-none">ObsScheme(
+    obs...;
+    pattern=[1:length(obs)...],
+    full_pattern=[],
+    mode=Val(:simple)
+)</code></pre><p>Base constructor.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaDiffusionBayes/ObservationSchemes.jl/blob/8a9cd547b2c5206480582aef449fb20b7478f5ff/src/obs_scheme.jl#LL1-L30">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="ObservationSchemes.load_data" href="#ObservationSchemes.load_data"><code>ObservationSchemes.load_data</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia">load_data(os::ObsScheme, tt, xx)</code></pre><p>Decorate the data in <code>xx</code> and times of recordings in <code>tt</code> according to an observation scheme template stored in <code>os</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaDiffusionBayes/ObservationSchemes.jl/blob/8a9cd547b2c5206480582aef449fb20b7478f5ff/src/obs_scheme.jl#LL51-L56">source</a></section><section><div><pre><code class="language-julia">load_data(os::ObsScheme, tt_xx)</code></pre><p>Same as <code>load_data(os::ObsScheme, tt, xx)</code>, but <code>tt_xx</code> is a vector of tuples that pair the observations with their recorded times.</p><pre><code class="language-none">load_data(os::ObsScheme, tt_xx_filename::String)</code></pre><p>Same as above, but <code>tt_xx</code> are stored in a .csv file named <code>tt_xx_filename</code>, with each row containing time <code>t</code> and its respective observation <code>x</code> stored back-to-back.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaDiffusionBayes/ObservationSchemes.jl/blob/8a9cd547b2c5206480582aef449fb20b7478f5ff/src/obs_scheme.jl#LL59-L70">source</a></section></article><p>For instance, if all data are collected according to a single observation scheme:</p><pre><code class="language-julia">t, v = 1.0, [1.0, 2.0, 3.0] # dummy values, only DataType matter
+obs = LinearGsnObs(t, v; full_obs=true)</code></pre><p>Then we can define it as an observation scheme and load the data as follows:</p><pre><code class="language-julia"># ----- raw data ------------------------#
+tt = [1.0, 2.0, 3.0, 4.0, 5.0]           #
+xx = [i.+rand(3) for i in eachindex(tt)] #
+# -------------------------------------- #
+
+data = load_data(ObsScheme(obs), tt, xx)</code></pre><p>If more than one type of observation schemes are used then we can pass a list of them to <code>ObsScheme</code>, and then, specify the pattern in which they should be cycled through when loading in the data:</p><pre><code class="language-julia"># another observation scheme:
+t, v = 1.0, SVector{2,Float64}(1.0, 2.0)
+obs2 = LinearGsnObs(t, v; full_obs=true)
+
+# -------------------------------------- other raw data ------------------------#
+xx = [i%2==1 ? i.+rand(3) : i.+rand(SVector{2,Float64}) for i in eachindex(tt)] #
+# ------------------------------------------------------------------------------#
+
+# load the data:
+data = load_data(ObsScheme(obs, obs2; pattern=[1,2]), tt, xx)
+# ↑ simply alternate between `obs` and `obs2`</code></pre><h2 id="Generating-data-directly-from-the-simulated-trajectory-1"><a class="docs-heading-anchor" href="#Generating-data-directly-from-the-simulated-trajectory-1">Generating data directly from the simulated trajectory</a><a class="docs-heading-anchor-permalink" href="#Generating-data-directly-from-the-simulated-trajectory-1" title="Permalink"></a></h2><hr/><p>Very often we need to simulate some data from the underlying model for testing purposes. To help ourselves a little with this process we can use</p><article class="docstring"><header><a class="docstring-binding" id="Base.collect" href="#Base.collect"><code>Base.collect</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia">Base.collect(os::ObsScheme, path, step=1, record_start_pt=false)</code></pre><p>Record observations from a raw trajectory <code>path</code> according to the observation scheme <code>os</code>. Collect 1 observation for every <code>step</code> many points in the raw data. If <code>record_start_pt</code>, then the starting is recorded, otherwise it is omitted. <code>path</code> should have fields <code>.x</code> and <code>.t</code> with the underlying process and times respectively.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaDiffusionBayes/ObservationSchemes.jl/blob/8a9cd547b2c5206480582aef449fb20b7478f5ff/src/obs_scheme.jl#LL140-L148">source</a></section></article><p>We only need to simulate the trajectory and define the observation scheme. Then, we can use <code>collect</code> to generate an appropriately decorated dataset from such raw recording.</p><h3 id="example_for_obs_scheme-1"><a class="docs-heading-anchor" href="#example_for_obs_scheme-1">Example</a><a class="docs-heading-anchor-permalink" href="#example_for_obs_scheme-1" title="Permalink"></a></h3><p>For instance we can use the package <a href="https://github.com/JuliaDiffusionBayes/DiffusionDefinition.jl">DiffusionDefinition.jl</a> to simulate a trajectory from the FitzHugh–Nagumo model:</p><pre><code class="language-julia">using DiffusionDefinition, StaticArrays
+@load_diffusion FitzHughNagumo
+
+P = FitzHughNagumo(0.1, -0.8, 1.5, 0.0, 0.3)
+tt = 0.0:0.0001:10.0
+x0 = @SVector [-0.6, -0.6]
+X = rand(P, tt, x0)</code></pre><p>then, define the observation scheme:</p><pre><code class="language-julia">obs_sch = ObsScheme(
+    LinearGsnObs(
+        0.0, (@SVector [0.0]);
+        L = (@SMatrix [1.0 0.0;]),
+        Σ = (@SMatrix [0.01;]),
+    )
+)</code></pre><p>and then very simply generate a dataset</p><pre><code class="language-julia">data = collect(obs_sch, X, 1000, false)</code></pre><p>Examining the first two and the last observation yield:</p><pre><code class="language-julia">julia&gt; summary(data[1])
+⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤
+|Observation `v = Lx+ξ`, where `L` is a (1, 2)-matrix, `x` is a state of the stochastic process and `ξ`∼N(μ,Σ).
+|...
+|| ν: [-1.0821504043466732] (observation),
+||  → typeof(ν): SArray{Tuple{1},Float64,1,1},
+|| made at time 0.1.
+|...
+|L: [1.0 0.0],
+|   → typeof(L): SArray{Tuple{1,2},Float64,2,2}
+|μ: [0.0],
+|   → typeof(μ): SArray{Tuple{1},Float64,1,1}
+|Σ: [0.01],
+|   → typeof(Σ): SArray{Tuple{1,1},Float64,2,1}
+|...
+|This is NOT an exact observation.
+|...
+|It does not depend on any additional parameters.
+|...
+|No first passage times recorded.
+⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆
+
+julia&gt; summary(data[2])
+⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤
+|Observation `v = Lx+ξ`, where `L` is a (1, 2)-matrix, `x` is a state of the stochastic process and `ξ`∼N(μ,Σ).
+|...
+|| ν: [-0.9679347555098883] (observation),
+||  → typeof(ν): SArray{Tuple{1},Float64,1,1},
+|| made at time 0.2.
+|...
+|L: [1.0 0.0],
+|   → typeof(L): SArray{Tuple{1,2},Float64,2,2}
+|μ: [0.0],
+|   → typeof(μ): SArray{Tuple{1},Float64,1,1}
+|Σ: [0.01],
+|   → typeof(Σ): SArray{Tuple{1,1},Float64,2,1}
+|...
+|This is NOT an exact observation.
+|...
+|It does not depend on any additional parameters.
+|...
+|No first passage times recorded.
+⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆
+
+julia&gt; summary(data[end])
+⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤⏤
+|Observation `v = Lx+ξ`, where `L` is a (1, 2)-matrix, `x` is a state of the stochastic process and `ξ`∼N(μ,Σ).
+|...
+|| ν: [0.8136510716798605] (observation),
+||  → typeof(ν): SArray{Tuple{1},Float64,1,1},
+|| made at time 10.0.
+|...
+|L: [1.0 0.0],
+|   → typeof(L): SArray{Tuple{1,2},Float64,2,2}
+|μ: [0.0],
+|   → typeof(μ): SArray{Tuple{1},Float64,1,1}
+|Σ: [0.01],
+|   → typeof(Σ): SArray{Tuple{1,1},Float64,2,1}
+|...
+|This is NOT an exact observation.
+|...
+|It does not depend on any additional parameters.
+|...
+|No first passage times recorded.
+⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆ ⋆</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../multiple_observations/">« Multiple observations</a><a class="docs-footer-nextpage" href="../utility_functions/">Utility fuctions »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 16 June 2020 00:23">Tuesday 16 June 2020</span>. Using Julia version 1.4.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
